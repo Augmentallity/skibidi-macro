@@ -15,6 +15,7 @@ OPTIONS = [
     "Set WAVE COMPLETED LABEL",
     "Set DEFEAT LABEL",
     "Set HP BAR ZERO",
+    "Set DISCONNECTED DIALOG BOX",
 ]
 
 
@@ -61,6 +62,12 @@ def open_editor(selected_index: int):
                 "HP BAR ZERO",
                 "Same as DEFEAT LABEL. To prevent any false positives in the case DEFEAT LABEL gets detected, this must be set to the pixels in the HP bar that have been grayed out for losing HP.\nIt is fine to set this to any pixel within the HP bar that is gray and below 100% HP.",
                 utils.HP_BAR_ZERO,
+            )
+        case 7:
+            edit(
+                "DISCONNECTED DIALOG BOX",
+                "In the event Roblox disconnects your client due to lag, afk timeout, etc., detecting the presence of the disconnected label allows the program to automatically retry connections until you load back in.",
+                utils.DISCONNECTED_DIALOG_BOX,
             )
         case _:
             raise Exception(f"Invalid index {selected_index}")
