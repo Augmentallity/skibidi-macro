@@ -144,6 +144,9 @@ def main():
                     os.system("%CD%/bin/startmarineford.exe")
                     break
 
+            is_normal_camera_angle = False
+            macro_parent_folder = ""
+
             while True:
                 listeners()
                 color = pyautogui.pixel(
@@ -151,12 +154,27 @@ def main():
                     config[f"{utils.START_WAVE_BTN}_pos"][1],
                 )
                 if color == config[f"{utils.START_WAVE_BTN}_color"]:
+                    color2 = pyautogui.pixel(
+                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_pos"][0],
+                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_pos"][1],
+                    )
+                    is_normal_camera_angle = utils.is_approximate_color(
+                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_color"],
+                        color2,
+                        20,
+                    )
+                    if is_normal_camera_angle:
+                        print("Using NORMAL camera angle macros!")
+                        macro_parent_folder = "normal"
+                    else:
+                        print("Using BIRD-EYE camera angle macros!")
+                        macro_parent_folder = "birdeye"
                     os.system("%CD%/bin/clickwavestart.exe")
                     break
 
             # Listen for wave completions
             wave = 1
-            files = os.listdir("./wave_events")
+            files = os.listdir(f"./wave_events/{macro_parent_folder}")
 
             while True:
                 listeners()
@@ -167,13 +185,19 @@ def main():
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
                     print(f"\tWave {wave} completed")
                     if "every_wave_completed.exe" in files:
-                        os.system("%CD%/wave_events/every_wave_completed.exe")
+                        os.system(
+                            f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
+                        )
                     wave += 1
 
                     if str(wave) in files:
-                        wave_actions = os.listdir(f"wave_events/{wave}")
+                        wave_actions = os.listdir(
+                            f"wave_events/{macro_parent_folder}/{wave}"
+                        )
                         for action in wave_actions:
-                            os.system(f"%CD%/wave_events/{wave}/{action}")
+                            os.system(
+                                f"%CD%/wave_events/{macro_parent_folder}/{wave}/{action}"
+                            )
                     else:
                         print(
                             f"\t- No action found for this wave. Waiting till the end of wave {wave}..."

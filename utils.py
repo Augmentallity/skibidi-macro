@@ -6,6 +6,7 @@ WAVE_COMPLETED_LABEL = "wave_cmplt_label"
 DISCONNECTED_DIALOG_BOX = "disconnected_dialog_box"
 DEFEAT_LABEL = "defeat_label"
 HP_BAR_ZERO = "hp_zero_bar"
+NORMAL_CAMERA_ANGLE_INDICATOR = "normal_camera_detector"
 
 DEFAULT_CONFIG = {
     "waves_per_run": 10,
@@ -25,7 +26,15 @@ DEFAULT_CONFIG = {
     f"{DEFEAT_LABEL}_color": (222, 0, 0),
     f"{HP_BAR_ZERO}_pos": (603, 67),
     f"{HP_BAR_ZERO}_color": (25, 22, 22),
+    f"{NORMAL_CAMERA_ANGLE_INDICATOR}_pos": (1370, 144),
+    f"{NORMAL_CAMERA_ANGLE_INDICATOR}_color": (16, 71, 132),
 }
+
+
+def merge_with_default_config(config: dict[str, any]):
+    for key in DEFAULT_CONFIG:
+        if key not in config:
+            config[key] = DEFAULT_CONFIG[key]
 
 
 def read_config() -> dict[str, any]:
@@ -35,7 +44,7 @@ def read_config() -> dict[str, any]:
         for line in file:
             (prop, value) = line.split("=")
             config[prop] = eval(value)
-
+        merge_with_default_config(config)
         return config
     except:
         save_config(DEFAULT_CONFIG)

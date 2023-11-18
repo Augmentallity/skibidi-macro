@@ -16,6 +16,7 @@ OPTIONS = [
     "Set DEFEAT LABEL",
     "Set HP BAR ZERO",
     "Set DISCONNECTED DIALOG BOX",
+    "Set NORMAL CAMERA ANGLE DETECTION",
 ]
 
 
@@ -68,6 +69,12 @@ def open_editor(selected_index: int):
                 "DISCONNECTED DIALOG BOX",
                 "In the event Roblox disconnects your client due to lag, afk timeout, etc., detecting the presence of the disconnected label allows the program to automatically retry connections until you load back in.",
                 utils.DISCONNECTED_DIALOG_BOX,
+            )
+        case 8:
+            edit(
+                "NORMAL CAMERA ANGLE DETECTION",
+                "Marine's ford has two camera angles. One of it is a camera angle almost similar to a bird-eye's view, while the other is a normal camera angle.\nCreating a macro and then for it to not work because a change in the camera angle can be frustrating.\nBy detecting the starting camera angle, the program can execute macros specific to that camera angle.",
+                utils.NORMAL_CAMERA_ANGLE_INDICATOR,
             )
         case _:
             raise Exception(f"Invalid index {selected_index}")
