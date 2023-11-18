@@ -164,10 +164,10 @@ def main():
                         20,
                     )
                     if is_normal_camera_angle:
-                        print("Using NORMAL camera angle macros!")
+                        print("\tUsing NORMAL camera angle macros!")
                         macro_parent_folder = "normal"
                     else:
-                        print("Using BIRD-EYE camera angle macros!")
+                        print("\tUsing BIRD-EYE camera angle macros!")
                         macro_parent_folder = "birdeye"
                     os.system("%CD%/bin/clickwavestart.exe")
                     break
@@ -183,6 +183,12 @@ def main():
                     config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][1],
                 )
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
+                    if wave == run_till_start_of_wave:
+                        runs += 1
+                        os.system("%CD%/bin/closegame.exe")
+                        skip_joining_private_server = False
+                        break
+
                     print(f"\tWave {wave} completed")
                     if "every_wave_completed.exe" in files:
                         os.system(
@@ -202,13 +208,6 @@ def main():
                         print(
                             f"\t- No action found for this wave. Waiting till the end of wave {wave}..."
                         )
-                    # if wave >= 2 and wave < RUN_TILL_START_OF_WAVE:
-                    #     os.system("upgradeunit.exe")
-                    if wave == run_till_start_of_wave:
-                        runs += 1
-                        os.system("%CD%/bin/closegame.exe")
-                        skip_joining_private_server = False
-                        break
 
                     s = time.time()
                     while time.time() - s <= 5:
