@@ -21,6 +21,15 @@ disconnections = 0
 UPDATE_RATE = (1 / 60) * 100
 
 
+def run_macro(path: str, autofocus: bool = True):
+    if autofocus:
+        roblox = win32gui.FindWindow(None, "Roblox")
+        pyautogui.press("alt")
+        win32gui.SetForegroundWindow(roblox)
+
+    os.system(path)
+
+
 def get_min_max_run() -> tuple[float, int, float, int]:
     if len(runs) == 0:
         return (0.0, -1, 0.0, -1)
@@ -116,7 +125,7 @@ def main():
             # print("\tLaunching roblox...")
             # Auto-start anime adventures private server
             if not skip_joining_private_server:
-                os.system("%CD%/bin/joinprivateserver.exe")
+                run_macro("%CD%/bin/joinprivateserver.exe", autofocus=False)
 
             is_opened = False
             while not is_opened:
@@ -167,7 +176,7 @@ def main():
                 )
                 if color == config[f"{utils.LOBBY_PLAY_BTN_PROP}_color"]:
                     logs.append("\tSuccessfully loaded in-game")
-                    os.system("%CD%/bin/lobbyclickplay.exe")
+                    run_macro("%CD%/bin/lobbyclickplay.exe")
                     # pyautogui.moveTo(x=153, y=479, duration=DELAY)
                     # pyautogui.click(clicks=2, interval=DELAY)
                     break
@@ -204,7 +213,7 @@ def main():
                     config[f"{utils.CANCEL_MAP_BTN}_pos"][1],
                 )
                 if color == config[f"{utils.CANCEL_MAP_BTN}_color"]:
-                    os.system("%CD%/bin/selectmarineford.exe")
+                    run_macro("%CD%/bin/selectmarineford.exe")
                     break
 
             while True:
@@ -214,7 +223,7 @@ def main():
                     config[f"{utils.START_MAP_BTN}_pos"][1],
                 )
                 if color == config[f"{utils.START_MAP_BTN}_color"]:
-                    os.system("%CD%/bin/startmarineford.exe")
+                    run_macro("%CD%/bin/startmarineford.exe")
                     break
 
             is_normal_camera_angle = False
@@ -242,13 +251,12 @@ def main():
                     else:
                         logs.append("\tUsing BIRD-EYE camera angle macros!")
                         macro_parent_folder = "birdeye"
-                    os.system("%CD%/bin/clickwavestart.exe")
+                    run_macro("%CD%/bin/clickwavestart.exe")
                     break
 
             # Listen for wave completions
             wave = 1
             files = os.listdir(f"./wave_events/{macro_parent_folder}")
-            roblox = win32gui.FindWindow(None, "Roblox")
 
             while True:
                 listeners()
@@ -259,7 +267,7 @@ def main():
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
                     logs.append(f"\tWave {wave} completed")
                     if "every_wave_completed.exe" in files:
-                        os.system(
+                        run_macro(
                             f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
                         )
                     wave += 1
@@ -268,18 +276,16 @@ def main():
                         end_time = time.perf_counter() - now
                         runs.append(end_time)
                         avg_run_time += end_time
-                        os.system("%CD%/bin/closegame.exe")
+                        run_macro("%CD%/bin/closegame.exe", autofocus=False)
                         skip_joining_private_server = False
                         break
 
                     if str(wave) in files:
-                        pyautogui.press("alt")
-                        win32gui.SetForegroundWindow(roblox)
                         wave_actions = os.listdir(
                             f"wave_events/{macro_parent_folder}/{wave}"
                         )
                         for action in wave_actions:
-                            os.system(
+                            run_macro(
                                 f"%CD%/wave_events/{macro_parent_folder}/{wave}/{action}"
                             )
                     else:
