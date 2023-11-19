@@ -13,14 +13,14 @@ def windowEnumerationHandler(hwnd, top_windows):
     top_windows.append((hwnd, win32gui.GetWindowText(hwnd)))
 
 
-runs = 0
+runs: list[int] = []
 losses = 0
 disconnections = 0
 
 
 def main():
     # Tracking variables
-    time_elapsed = time.time()
+    time_elapsed = time.perf_counter()
 
     # Controller
     kb_controller = pynput.keyboard.Controller()
@@ -28,24 +28,25 @@ def main():
     run_till_start_of_wave = 10
     config = utils.read_config()
     run_till_start_of_wave = config["waves_per_run"] + 1
+    avg_run_time: int = 0
 
     def execute_run(skip_joining_private_server: bool):
         global runs
+        nonlocal avg_run_time
         config = utils.read_config()
 
         while True:
-            now = time.time()
-            seconds = int((now - time_elapsed) % 60)
-            minutes = int(((now - time_elapsed) // 60) % 60)
-            hours = int(((now - time_elapsed) // 3600) % 60)
+            now = time.perf_counter()
+
             log = [
                 "-----------------------------------------------",
-                f"\tTotal # of runs completed: {runs}",
-                f"\tTime elapsed: {hours}h {minutes}m {seconds}s",
+                f"\tTotal # of runs completed: {len(runs)}",
+                f"\tTime elapsed: {utils.to_human_time(now - time_elapsed)}",
+                f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
                 f"\tWaves per run: {run_till_start_of_wave - 1}",
                 f"\tGames lost: {losses}",
-                f"\tGames won: {runs - losses}",
-                f"\tWin rate: {f'{((runs-losses)/runs)*100}%' if runs > 0 else 'N/A'}",
+                f"\tGames won: {len(runs) - losses}",
+                f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
                 f"\t# of disconnections throughout session: {disconnections}",
                 "-----------------------------------------------",
                 "",
@@ -113,16 +114,29 @@ def main():
                     # pyautogui.click(clicks=2, interval=DELAY)
                     break
 
-            start = time.time()
+            start = time.perf_counter()
             kb_controller.press("d")
             kb_controller.press("w")
             kb_controller.press(pynput.keyboard.Key.shift_l)
             while True:
                 listeners()
-                if time.time() - start > 2:
+                if time.perf_counter() - start > 1.75:
                     kb_controller.release("d")
-                    kb_controller.release("w")
                     kb_controller.release(pynput.keyboard.Key.shift_l)
+                    break
+
+            start = time.perf_counter()
+            while True:
+                kb_controller.release("d")
+                kb_controller.press("a")
+                time.sleep(0.01)
+                kb_controller.release("a")
+                kb_controller.press("d")
+                time.sleep(0.01)
+                if time.perf_counter() - start > 0.5:
+                    kb_controller.release("w")
+                    kb_controller.release("a")
+                    kb_controller.release("d")
                     break
 
             while True:
@@ -185,7 +199,6 @@ def main():
                 )
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
                     print(f"\tWave {wave} completed")
-                    roblox = win32gui.FindWindow(None, "Roblox")
                     if "every_wave_completed.exe" in files:
                         os.system(
                             f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
@@ -193,7 +206,9 @@ def main():
                     wave += 1
 
                     if wave == run_till_start_of_wave:
-                        runs += 1
+                        end_time = time.perf_counter() - now
+                        runs.append(end_time)
+                        avg_run_time += end_time
                         os.system("%CD%/bin/closegame.exe")
                         skip_joining_private_server = False
                         break
@@ -208,28 +223,26 @@ def main():
                             )
                     else:
                         print(
-                            f"\t- No action found for this wave. Waiting till the end of wave {wave}..."
+                            f"\t- No action found for wave {wave}. Waiting till the end of wave {wave}..."
                         )
 
-                    s = time.time()
-                    while time.time() - s <= 5:
+                    s = time.perf_counter()
+                    while time.perf_counter() - s <= 5:
                         detect_stop()
 
     def detect_stop():
         if keyboard.is_pressed("backspace"):
-            now = time.time()
-            seconds = int((now - time_elapsed) % 60)
-            minutes = int(((now - time_elapsed) // 60) % 60)
-            hours = int(((now - time_elapsed) // 3600) % 60)
+            now = time.perf_counter()
             os.system("cls")
             results = [
                 "-----------------------------------------------",
-                f"\tTotal # of runs completed: {runs}",
-                f"\tTime elapsed: {hours}h {minutes}m {seconds}s",
+                f"\tTotal # of runs completed: {len(runs)}",
+                f"\tTime elapsed: {utils.to_human_time(now - time_elapsed)}",
+                f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
                 f"\tWaves per run: {run_till_start_of_wave - 1}",
                 f"\tGames lost: {losses}",
-                f"\tGames won: {runs - losses}",
-                f"\tWin rate: {f'{((runs-losses)/runs)*100}%' if runs > 0 else 'N/A'}",
+                f"\tGames won: {len(runs) - losses}",
+                f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
                 f"\t# of disconnections throughout session: {disconnections}",
                 "-----------------------------------------------",
                 "",
@@ -266,14 +279,14 @@ def main():
                     if keyboard.is_pressed("backspace"):
                         raise Exception()
                     os.system("%CD%/bin/joinprivateserver.exe")
-                    start = time.time()
-                    while time.time() - start <= 1:
+                    start = time.perf_counter()
+                    while time.perf_counter() - start <= 1:
                         if keyboard.is_pressed("backspace"):
                             raise Exception()
                     if pyautogui.pixel(x=953, y=482) == (255, 255, 255):
                         break
-                    start = time.time()
-                    while time.time() - start <= 0.1:
+                    start = time.perf_counter()
+                    while time.perf_counter() - start <= 0.1:
                         if keyboard.is_pressed("backspace"):
                             raise Exception()
 
