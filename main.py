@@ -1,3 +1,4 @@
+import threading
 import utils
 import pyautogui
 import keyboard
@@ -6,6 +7,7 @@ import time
 import os
 import win32gui
 import win32con
+from typing import Callable
 from configurator import is_focused
 
 
@@ -16,6 +18,7 @@ def windowEnumerationHandler(hwnd, top_windows):
 runs: list[float] = []
 losses = 0
 disconnections = 0
+UPDATE_RATE = (1 / 60) * 100
 
 
 def get_min_max_run() -> tuple[float, int, float, int]:
@@ -33,6 +36,48 @@ def get_min_max_run() -> tuple[float, int, float, int]:
     return (h_run, h_idx, l_run, l_idx)
 
 
+def timer(
+    should_stop: Callable[[], bool],
+    start_time: Callable[[], float],
+    avg_run_time: Callable[[], float],
+    run_till_start_of_wave: Callable[[], int],
+    logs: Callable[[], list[str]],
+):
+    while not should_stop():
+        now = time.perf_counter()
+        log = [
+            *catalog(now, start_time(), avg_run_time(), run_till_start_of_wave()),
+            "",
+            "To stop farming for gems, press BACKSPACE on your keyboard",
+            "",
+            *logs(),
+        ]
+        print("\n".join(log))
+        time.sleep(UPDATE_RATE)
+        os.system("cls")
+
+
+def catalog(
+    now: float, start_time: float, avg_run_time: float, run_till_start_of_wave: int
+):
+    highest_run_time, h_idx, lowest_run_time, l_idx = get_min_max_run()
+    return (
+        "\t\t[RUNS INFO]",
+        f"\tTotal # of runs completed: {len(runs)}",
+        f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
+        f"\tAverage run time: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
+        f"\tSlowest run time: {f'{utils.to_human_time(highest_run_time)} (Achieved at run #{h_idx + 1})' if highest_run_time != 0 else 'N/A'}",
+        f"\tFastest run time: {f'{utils.to_human_time(lowest_run_time)} (Achieved at run #{l_idx + 1})' if lowest_run_time != 0 else 'N/A'}",
+        "",
+        "\t\t[GAME STATS]",
+        f"\tWaves per run: {run_till_start_of_wave - 1}",
+        f"\tGames lost: {losses}",
+        f"\tGames won: {len(runs) - losses}",
+        f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
+        f"\t# of disconnections: {disconnections}",
+    )
+
+
 def main():
     # Tracking variables
     start_time = time.perf_counter()
@@ -44,41 +89,30 @@ def main():
     config = utils.read_config()
     run_till_start_of_wave = config["waves_per_run"] + 1
     avg_run_time: int = 0
+    should_stop_timer = False
+    logs: list[str] = []
 
-    def catalog(now: float):
-        highest_run_time, h_idx, lowest_run_time, l_idx = get_min_max_run()
-        return (
-            "\t\t[RUNS INFO]",
-            f"\tTotal # of runs completed: {len(runs)}",
-            f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
-            f"\tAverage run time: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
-            f"\tSlowest run time: {f'{utils.to_human_time(highest_run_time)} (Achieved at run #{h_idx + 1})' if highest_run_time != 0 else 'N/A'}",
-            f"\tFastest run time: {f'{utils.to_human_time(lowest_run_time)} (Achieved at run #{l_idx + 1})' if lowest_run_time != 0 else 'N/A'}",
-            "",
-            "\t\t[GAME STATS]",
-            f"\tWaves per run: {run_till_start_of_wave - 1}",
-            f"\tGames lost: {losses}",
-            f"\tGames won: {len(runs) - losses}",
-            f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
-            f"\t# of disconnections: {disconnections}",
-        )
+    t1 = threading.Thread(
+        target=timer,
+        args=(
+            lambda: should_stop_timer,
+            lambda: start_time,
+            lambda: avg_run_time,
+            lambda: run_till_start_of_wave,
+            lambda: logs,
+        ),
+    )
+    t1.start()
 
     def execute_run(skip_joining_private_server: bool):
         global runs
         nonlocal avg_run_time
+        nonlocal logs
         config = utils.read_config()
 
         while True:
             now = time.perf_counter()
-
-            log = [
-                *catalog(now),
-                "",
-                "To stop farming for gems, press BACKSPACE on your keyboard",
-                "",
-            ]
-            os.system("cls")
-            print("\n".join(log))
+            logs.clear()
             # print("\tLaunching roblox...")
             # Auto-start anime adventures private server
             if not skip_joining_private_server:
@@ -93,7 +127,7 @@ def main():
                     HWND = process[0]
                     if process[1] == "Roblox":
                         is_opened = True
-                        print("\tDetected Roblox application")
+                        logs.append("\tDetected Roblox application")
                         win32gui.ShowWindow(HWND, win32con.SW_RESTORE)
                         win32gui.SetWindowPos(
                             HWND,
@@ -132,7 +166,7 @@ def main():
                     config[f"{utils.LOBBY_PLAY_BTN_PROP}_pos"][1],
                 )
                 if color == config[f"{utils.LOBBY_PLAY_BTN_PROP}_color"]:
-                    print("\tSuccessfully loaded in-game")
+                    logs.append("\tSuccessfully loaded in-game")
                     os.system("%CD%/bin/lobbyclickplay.exe")
                     # pyautogui.moveTo(x=153, y=479, duration=DELAY)
                     # pyautogui.click(clicks=2, interval=DELAY)
@@ -203,10 +237,10 @@ def main():
                         20,
                     )
                     if is_normal_camera_angle:
-                        print("\tUsing NORMAL camera angle macros!")
+                        logs.append("\tUsing NORMAL camera angle macros!")
                         macro_parent_folder = "normal"
                     else:
-                        print("\tUsing BIRD-EYE camera angle macros!")
+                        logs.append("\tUsing BIRD-EYE camera angle macros!")
                         macro_parent_folder = "birdeye"
                     os.system("%CD%/bin/clickwavestart.exe")
                     break
@@ -223,7 +257,7 @@ def main():
                     config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][1],
                 )
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
-                    print(f"\tWave {wave} completed")
+                    logs.append(f"\tWave {wave} completed")
                     if "every_wave_completed.exe" in files:
                         os.system(
                             f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
@@ -249,7 +283,7 @@ def main():
                                 f"%CD%/wave_events/{macro_parent_folder}/{wave}/{action}"
                             )
                     else:
-                        print(
+                        logs.append(
                             f"\t- No action found for wave {wave}. Waiting till the end of wave {wave}..."
                         )
 
@@ -258,11 +292,14 @@ def main():
                         detect_stop()
 
     def detect_stop():
+        nonlocal should_stop_timer
         if keyboard.is_pressed("backspace"):
+            should_stop_timer = True
+            time.sleep(UPDATE_RATE)
             now = time.perf_counter()
             os.system("cls")
             results = [
-                *catalog(now),
+                *catalog(now, start_time, avg_run_time, run_till_start_of_wave),
                 "",
                 "Press ESCAPE to exit",
                 "Press SHIFT to restart the program",
@@ -277,6 +314,7 @@ def main():
 
     def detect_disconnection():
         global disconnections
+        nonlocal logs
         color = pyautogui.pixel(
             config[f"{utils.DISCONNECTED_DIALOG_BOX}_pos"][0],
             config[f"{utils.DISCONNECTED_DIALOG_BOX}_pos"][1],
@@ -289,7 +327,7 @@ def main():
                 and tup[1] == win32con.SW_SHOWMAXIMIZED
             ):
                 disconnections += 1
-                print(
+                logs.append(
                     "\tDetected user has been disconnected. Attempting to reconnect..."
                 )
                 os.system("%CD%/bin/closegame.exe")
@@ -314,6 +352,7 @@ def main():
     def detect_loss():
         global runs
         global losses
+        nonlocal logs
         color1 = pyautogui.pixel(
             config[f"{utils.DEFEAT_LABEL}_pos"][0],
             config[f"{utils.DEFEAT_LABEL}_pos"][1],
@@ -325,7 +364,7 @@ def main():
             color1 == config[f"{utils.DEFEAT_LABEL}_color"]
             and color2 == config[f"{utils.HP_BAR_ZERO}_color"]
         ):
-            print("\tLoss detected. Redoing run...")
+            logs.append("\tLoss detected. Redoing run...")
             runs += 1
             losses += 1
             os.system("%CD%/bin/closegame.exe")
