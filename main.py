@@ -223,9 +223,7 @@ def main():
             hours = int(((now - time_elapsed) // 3600) % 60)
             os.system("cls")
             results = [
-                "Run cancelled by user.",
-                "",
-                "" "-----------------------------------------------",
+                "-----------------------------------------------",
                 f"\tTotal # of runs completed: {runs}",
                 f"\tTime elapsed: {hours}h {minutes}m {seconds}s",
                 f"\tWaves per run: {run_till_start_of_wave - 1}",
@@ -235,12 +233,16 @@ def main():
                 f"\t# of disconnections throughout session: {disconnections}",
                 "-----------------------------------------------",
                 "",
-                "Press ESCAPE to exit...",
+                "Press ESCAPE to exit",
+                "Press SHIFT to restart the program",
             ]
-            print("\n" + "\n".join(results))
-            if is_focused():
-                keyboard.wait("escape")
-                os._exit(0)
+            print("\n".join(results))
+            while True:
+                if is_focused():
+                    if keyboard.is_pressed("escape"):
+                        os._exit(0)
+                    if keyboard.is_pressed("shift"):
+                        main()
 
     def detect_disconnection():
         global disconnections
