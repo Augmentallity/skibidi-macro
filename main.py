@@ -6,6 +6,7 @@ import time
 import os
 import win32gui
 import win32con
+from configurator import is_focused
 
 
 def windowEnumerationHandler(hwnd, top_windows):
@@ -184,6 +185,7 @@ def main():
                 )
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
                     print(f"\tWave {wave} completed")
+                    roblox = win32gui.FindWindow(None, "Roblox")
                     if "every_wave_completed.exe" in files:
                         os.system(
                             f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
@@ -221,7 +223,6 @@ def main():
             hours = int(((now - time_elapsed) // 3600) % 60)
             os.system("cls")
             results = [
-                "",
                 "Run cancelled by user.",
                 "",
                 "" "-----------------------------------------------",
@@ -233,8 +234,13 @@ def main():
                 f"\tWin rate: {f'{((runs-losses)/runs)*100}%' if runs > 0 else 'N/A'}",
                 f"\t# of disconnections throughout session: {disconnections}",
                 "-----------------------------------------------",
+                "",
+                "Press ESCAPE to exit...",
             ]
-            raise Exception("\n" + "\n".join(results))
+            print("\n" + "\n".join(results))
+            if is_focused():
+                keyboard.wait("escape")
+                os._exit(0)
 
     def detect_disconnection():
         global disconnections
