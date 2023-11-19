@@ -67,3 +67,10 @@ def is_approximate_color(
         and abs(color1[1] - color2[1]) <= difference
         and abs(color1[2] - color2[2]) <= difference
     )
+
+
+def to_human_time(seconds: int | float):
+    seconds = int(seconds % 60)
+    minutes = int((seconds // 60) % 60)
+    hours = int((seconds // 3600) % 60)
+    return f"{hours}h {minutes}m {seconds}s"
