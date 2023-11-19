@@ -183,18 +183,18 @@ def main():
                     config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][1],
                 )
                 if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
-                    if wave == run_till_start_of_wave:
-                        runs += 1
-                        os.system("%CD%/bin/closegame.exe")
-                        skip_joining_private_server = False
-                        break
-
                     print(f"\tWave {wave} completed")
                     if "every_wave_completed.exe" in files:
                         os.system(
                             f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
                         )
                     wave += 1
+
+                    if wave == run_till_start_of_wave:
+                        runs += 1
+                        os.system("%CD%/bin/closegame.exe")
+                        skip_joining_private_server = False
+                        break
 
                     if str(wave) in files:
                         wave_actions = os.listdir(
