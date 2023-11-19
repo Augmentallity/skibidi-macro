@@ -20,7 +20,7 @@ disconnections = 0
 
 def main():
     # Tracking variables
-    time_elapsed = time.perf_counter()
+    start_time = time.perf_counter()
 
     # Controller
     kb_controller = pynput.keyboard.Controller()
@@ -41,7 +41,7 @@ def main():
             log = [
                 "-----------------------------------------------",
                 f"\tTotal # of runs completed: {len(runs)}",
-                f"\tTime elapsed: {utils.to_human_time(now - time_elapsed)}",
+                f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
                 f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
                 f"\tWaves per run: {run_till_start_of_wave - 1}",
                 f"\tGames lost: {losses}",
@@ -55,7 +55,7 @@ def main():
             ]
             os.system("cls")
             print("\n".join(log))
-            print("\tLaunching roblox...")
+            # print("\tLaunching roblox...")
             # Auto-start anime adventures private server
             if not skip_joining_private_server:
                 os.system("%CD%/bin/joinprivateserver.exe")
@@ -240,7 +240,7 @@ def main():
             results = [
                 "-----------------------------------------------",
                 f"\tTotal # of runs completed: {len(runs)}",
-                f"\tTime elapsed: {utils.to_human_time(now - time_elapsed)}",
+                f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
                 f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
                 f"\tWaves per run: {run_till_start_of_wave - 1}",
                 f"\tGames lost: {losses}",
