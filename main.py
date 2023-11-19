@@ -190,6 +190,7 @@ def main():
             # Listen for wave completions
             wave = 1
             files = os.listdir(f"./wave_events/{macro_parent_folder}")
+            roblox = win32gui.FindWindow(None, "Roblox")
 
             while True:
                 listeners()
@@ -214,6 +215,8 @@ def main():
                         break
 
                     if str(wave) in files:
+                        pyautogui.press("alt")
+                        win32gui.SetForegroundWindow(roblox)
                         wave_actions = os.listdir(
                             f"wave_events/{macro_parent_folder}/{wave}"
                         )
