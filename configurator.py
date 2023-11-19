@@ -3,7 +3,8 @@ import pyautogui
 import os
 import utils
 import time
-
+import win32process
+import win32gui
 
 DELAY = 0.128
 
@@ -18,6 +19,12 @@ OPTIONS = [
     "Set DISCONNECTED DIALOG BOX",
     "Set NORMAL CAMERA ANGLE DETECTION",
 ]
+
+HWND = win32gui.GetForegroundWindow()
+
+
+def is_focused() -> bool:
+    return HWND == win32gui.GetForegroundWindow()
 
 
 def open_editor(selected_index: int):
@@ -92,8 +99,8 @@ def edit(name: str, description: str, config_property: str):
     print("\nSAVED (in animeadventures.config):")
     print(f"\tpos: {config[f'{config_property}_pos']}")
     print(f"\tcolor: {config[f'{config_property}_color']}")
-    while True and not keyboard.is_pressed("escape"):
-        if keyboard.is_pressed("left_shift"):
+    while not keyboard.is_pressed("escape") or not is_focused():
+        if keyboard.is_pressed("left_shift") and is_focused():
             config = utils.read_config()
             os.system("cls")
             (x, y) = pyautogui.position()
@@ -116,7 +123,7 @@ def edit(name: str, description: str, config_property: str):
             ]
             result = "\n".join(log)
             print(result)
-        if keyboard.is_pressed("backspace"):
+        if keyboard.is_pressed("backspace") and is_focused():
             if pixel == None or color == None:
                 break
             config = utils.read_config()
@@ -136,7 +143,8 @@ def main():
     pressed_key_time_start = 0
     pressed_key_time_end = 0
     prev_pressed_key = None
-    while True and not keyboard.is_pressed("escape"):
+
+    while not keyboard.is_pressed("escape") or not is_focused():
         os.system("cls")
         menu = [
             "Welcome to the in-game event listener editor",
@@ -157,7 +165,7 @@ def main():
         if pressed_key_time_end - pressed_key_time_start >= DELAY:
             time.sleep(DELAY)
         while True:
-            if keyboard.is_pressed("up"):
+            if keyboard.is_pressed("up") and is_focused():
                 if prev_pressed_key != "up":
                     selected_index = max(0, selected_index - 1)
                     prev_pressed_key = "up"
@@ -167,7 +175,7 @@ def main():
                     selected_index = max(0, selected_index - 1)
 
                 break
-            elif keyboard.is_pressed("down"):
+            elif keyboard.is_pressed("down") and is_focused():
                 if prev_pressed_key != "down":
                     selected_index = min(selected_index + 1, len(OPTIONS) - 1)
                     prev_pressed_key = "down"
@@ -176,9 +184,9 @@ def main():
                 if pressed_key_time_end - pressed_key_time_start >= DELAY:
                     selected_index = min(selected_index + 1, len(OPTIONS) - 1)
                 break
-            elif keyboard.is_pressed("escape"):
+            elif keyboard.is_pressed("escape") and is_focused():
                 break
-            elif keyboard.is_pressed("space"):
+            elif keyboard.is_pressed("space") and is_focused():
                 open_editor(selected_index)
                 break
 
