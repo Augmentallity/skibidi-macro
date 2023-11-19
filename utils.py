@@ -71,6 +71,6 @@ def is_approximate_color(
 
 def to_human_time(d: int | float):
     seconds = round(d % 60)
-    minutes = (seconds // 60) % 60
-    hours = (seconds // 3600) % 60
+    minutes = (d // 60) % 60
+    hours = (d // 3600) % 60
     return f"{hours}h {minutes}m {seconds}s"
