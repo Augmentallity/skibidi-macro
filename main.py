@@ -13,9 +13,24 @@ def windowEnumerationHandler(hwnd, top_windows):
     top_windows.append((hwnd, win32gui.GetWindowText(hwnd)))
 
 
-runs: list[int] = []
+runs: list[float] = []
 losses = 0
 disconnections = 0
+
+
+def get_min_max_run() -> tuple[float, int, float, int]:
+    if len(runs) == 0:
+        return (0.0, -1, 0.0, -1)
+    l_run, h_run, l_idx, h_idx = runs[0], runs[0], 0, 0
+    for i in range(1, len(runs)):
+        if h_run < runs[i]:
+            h_run = runs[i]
+            h_idx = i
+        if l_run > runs[i]:
+            l_run = runs[i]
+            l_idx = i
+
+    return (h_run, h_idx, l_run, l_idx)
 
 
 def main():
@@ -30,6 +45,24 @@ def main():
     run_till_start_of_wave = config["waves_per_run"] + 1
     avg_run_time: int = 0
 
+    def catalog(now: float):
+        highest_run_time, h_idx, lowest_run_time, l_idx = get_min_max_run()
+        return (
+            "\t\t[RUNS INFO]",
+            f"\tTotal # of runs completed: {len(runs)}",
+            f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
+            f"\tAverage run time: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
+            f"\tSlowest run time: {f'{utils.to_human_time(highest_run_time)} (Achieved at run #{h_idx + 1})' if highest_run_time != 0 else 'N/A'}",
+            f"\tFastest run time: {f'{utils.to_human_time(lowest_run_time)} (Achieved at run #{l_idx + 1})' if lowest_run_time != 0 else 'N/A'}",
+            "",
+            "\t\t[GAME STATS]",
+            f"\tWaves per run: {run_till_start_of_wave - 1}",
+            f"\tGames lost: {losses}",
+            f"\tGames won: {len(runs) - losses}",
+            f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
+            f"\t# of disconnections: {disconnections}",
+        )
+
     def execute_run(skip_joining_private_server: bool):
         global runs
         nonlocal avg_run_time
@@ -39,16 +72,7 @@ def main():
             now = time.perf_counter()
 
             log = [
-                "-----------------------------------------------",
-                f"\tTotal # of runs completed: {len(runs)}",
-                f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
-                f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
-                f"\tWaves per run: {run_till_start_of_wave - 1}",
-                f"\tGames lost: {losses}",
-                f"\tGames won: {len(runs) - losses}",
-                f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
-                f"\t# of disconnections throughout session: {disconnections}",
-                "-----------------------------------------------",
+                *catalog(now),
                 "",
                 "To stop farming for gems, press BACKSPACE on your keyboard",
                 "",
@@ -238,16 +262,7 @@ def main():
             now = time.perf_counter()
             os.system("cls")
             results = [
-                "-----------------------------------------------",
-                f"\tTotal # of runs completed: {len(runs)}",
-                f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
-                f"\tAverage time per run: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
-                f"\tWaves per run: {run_till_start_of_wave - 1}",
-                f"\tGames lost: {losses}",
-                f"\tGames won: {len(runs) - losses}",
-                f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
-                f"\t# of disconnections throughout session: {disconnections}",
-                "-----------------------------------------------",
+                *catalog(now),
                 "",
                 "Press ESCAPE to exit",
                 "Press SHIFT to restart the program",
