@@ -100,7 +100,7 @@ def edit(name: str, description: str, config_property: str):
     print(f"\tpos: {config[f'{config_property}_pos']}")
     print(f"\tcolor: {config[f'{config_property}_color']}")
     while not keyboard.is_pressed("escape") or not is_focused():
-        if keyboard.is_pressed("left_shift") and is_focused():
+        if keyboard.is_pressed("left_shift"):
             config = utils.read_config()
             os.system("cls")
             (x, y) = pyautogui.position()
@@ -123,7 +123,7 @@ def edit(name: str, description: str, config_property: str):
             ]
             result = "\n".join(log)
             print(result)
-        if keyboard.is_pressed("backspace") and is_focused():
+        if keyboard.is_pressed("backspace"):
             if pixel == None or color == None:
                 break
             config = utils.read_config()
