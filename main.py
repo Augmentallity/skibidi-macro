@@ -18,7 +18,7 @@ def windowEnumerationHandler(hwnd, top_windows):
 runs: list[float] = []
 losses = 0
 disconnections = 0
-UPDATE_RATE = (1 / 60) * 100
+UPDATE_RATE = 1 / 3
 
 
 def run_macro(path: str, autofocus: bool = True):
@@ -88,6 +88,12 @@ def catalog(
 
 
 def main():
+    global runs
+    global losses
+    global disconnections
+    runs.clear()
+    losses = 0
+    disconnections = 0
     # Tracking variables
     start_time = time.perf_counter()
 
