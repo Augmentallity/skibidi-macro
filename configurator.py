@@ -5,6 +5,7 @@ import utils
 import time
 import win32process
 import win32gui
+import menu
 
 DELAY = 0.128
 
@@ -18,6 +19,7 @@ OPTIONS = [
     "Set HP BAR ZERO",
     "Set DISCONNECTED DIALOG BOX",
     "Set NORMAL CAMERA ANGLE DETECTION",
+    "Configure EXITING MODE",
 ]
 
 HWND = win32gui.GetForegroundWindow()
@@ -83,8 +85,21 @@ def open_editor(selected_index: int):
                 "Marine's ford has two camera angles. One of it is a camera angle almost similar to a bird-eye's view, while the other is a normal camera angle.\nCreating a macro and then for it to not work because a change in the camera angle can be frustrating.\nBy detecting the starting camera angle, the program can execute macros specific to that camera angle.",
                 utils.NORMAL_CAMERA_ANGLE_INDICATOR,
             )
+        case 9:
+            configure_exit_mode()
         case _:
             raise Exception(f"Invalid index {selected_index}")
+
+
+def configure_exit_mode():
+    helper = "Editor: Configure how the program should exit/close Roblox"
+    how_to_use = "\nThere are two ways for how the program should exit:\n\t- Programatically (RECOMMENDED)\n\t\tThe program will automatically close/exit Roblox through Windows API\n\t- User-defined macro\n\t\tThe program will call the user's macro to exit/close the game"
+    os.system("cls")
+    config = utils.read_config()
+    print(helper)
+    print(how_to_use)
+    while not keyboard.is_pressed("escape") or not is_focused():
+        pass
 
 
 def edit(name: str, description: str, config_property: str):
@@ -192,4 +207,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    m = menu.Menu()
+    m.item(menu.MenuItem("a", lambda: print("a")))
+    m.item(menu.MenuItem("b", lambda: print("b")))
+    m.item(menu.MenuItem("c", lambda: print("c")))
+    m.item(menu.MenuItem("d", lambda: print("d")))
+    m.show()
