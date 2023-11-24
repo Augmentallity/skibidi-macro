@@ -22,6 +22,14 @@ OPTIONS = [
     "Configure EXITING MODE",
 ]
 
+EVENT_LISTENERS = [
+    "Disconnected Listener",
+    "Game Lost Listener",
+    "Wave Completed Listener",
+    "Wave Start Button Listener",
+    "Map Menu Listener",
+]
+
 HWND = win32gui.GetForegroundWindow()
 
 
@@ -206,11 +214,20 @@ def main():
                 break
 
 
+def event_listener_macros():
+    m = menu.Menu()
+    m.header(
+        "Event Listener Macros listen for events and respond to them when a corresponding event is detected via through pixel shown on screen.\nConfigure these to match with your system as these are necessary for your macros to work properly."
+    )
+    for option in EVENT_LISTENERS:
+        m.item(menu.MenuItem(option, lambda: print("Ho")))
+    m.show()
+
+
 if __name__ == "__main__":
     # main()
     m = menu.Menu()
-    m.item(menu.MenuItem("a", lambda: print("a")))
-    m.item(menu.MenuItem("b", lambda: print("b")))
-    m.item(menu.MenuItem("c", lambda: print("c")))
-    m.item(menu.MenuItem("d", lambda: print("d")))
+    m.header("Configuration Tool for Anime Adventures Macros")
+    m.item(menu.MenuItem("Event Listener Macros", event_listener_macros))
+    m.item(menu.MenuItem("In-Game Macros", lambda: print("a")))
     m.show()
