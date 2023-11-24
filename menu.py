@@ -18,6 +18,9 @@ class MenuItem:
         self._on_press = on_press
 
 
+stack = []
+
+
 class Menu:
     def __init__(self) -> None:
         self._items: list[MenuItem] = []
@@ -39,13 +42,19 @@ class Menu:
         self._idx = idx
 
     def on_press_handler(self, key: pynput.keyboard.Key | pynput.keyboard.KeyCode):
-        self._pressed = key
+        global stack
+        if stack[-1] == self:
+            self._pressed = key
 
     def on_release_handler(self, key: pynput.keyboard.Key | pynput.keyboard.KeyCode):
-        self._prev_pressed = key
-        self._pressed = None
+        global stack
+        if stack[-1] == self:
+            self._prev_pressed = key
+            self._pressed = None
 
     def show(self):
+        global stack
+        stack.append(self)
         prev_key_pressed = 0
         kb_listener = pynput.keyboard.Listener(
             on_press=self.on_press_handler, on_release=self.on_release_handler
@@ -54,9 +63,24 @@ class Menu:
 
         while True:
             os.system("cls")
-            print(self._idx)
-            print(self._prev_pressed)
-            print(self._pressed)
+            items: list[str] = []
+            for i in range(len(self._items)):
+                items.append(
+                    f"({'*' if i == self._idx else ' '}) {self._items[i]._name}"
+                )
+
+            print(
+                "\n".join(
+                    [
+                        self._description,
+                        "",
+                        *items,
+                        "",
+                        "Press SPACE to interact, ESC to go back. Navigate using ↑ and ↓ keys",
+                        "",
+                    ]
+                )
+            )
 
             if is_focused():
                 match self._pressed:
@@ -78,9 +102,12 @@ class Menu:
                             prev_key_pressed = time.time()
 
                     case pynput.keyboard.Key.esc:
-                        if self._prev_pressed != pynput.keyboard.Key.esc:
+                        if stack[-1] == self:
+                            stack.pop()
                             return
                     case pynput.keyboard.Key.space:
-                        if self._prev_pressed != pynput.keyboard.Key.space:
+                        if stack[-1] == self:
+                            self._prev_pressed = None
+                            self._pressed = None
                             self._items[self._idx]._on_press()
             time.sleep(1 / 30)
