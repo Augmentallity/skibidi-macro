@@ -13,7 +13,9 @@ def is_focused() -> bool:
 
 
 class MenuItem:
-    def __init__(self, name: str, on_press: Callable[[], None]) -> None:
+    def __init__(
+        self, name: Callable[[], str] | str, on_press: Callable[[], None]
+    ) -> None:
         self._name = name
         self._on_press = on_press
 
@@ -22,8 +24,9 @@ stack = []
 
 
 class Menu:
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
         self._items: list[MenuItem] = []
+        self._name = name
         self._idx: int = 0
         self._prev_idx: None | int = None
         self._description: str = ""
@@ -66,12 +69,14 @@ class Menu:
             items: list[str] = []
             for i in range(len(self._items)):
                 items.append(
-                    f"({'*' if i == self._idx else ' '}) {self._items[i]._name}"
+                    f"({'*' if i == self._idx else ' '}) {self._items[i]._name() if callable(self._items[i]._name) else self._items[i]._name}"
                 )
 
             print(
                 "\n".join(
                     [
+                        " / ".join([x._name for x in stack]),
+                        "",
                         self._description,
                         "",
                         *items,
