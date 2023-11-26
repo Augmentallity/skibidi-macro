@@ -1,3 +1,5 @@
+import json
+
 LOBBY_PLAY_BTN_PROP = "lobby_play_btn"
 CANCEL_MAP_BTN = "cancel_map_btn"
 START_MAP_BTN = "start_map_btn"
@@ -57,6 +59,37 @@ def save_config(config: dict[str, str]):
     for key, value in config.items():
         contents.append(f"{key}={value}")
     file.write("\n".join(contents))
+
+
+macros = None
+
+
+def read_macros() -> list[dict[str]]:
+    """
+    Reads the macros from macros.json
+
+    Returns:
+        A list containing macro objects
+    """
+    global macros
+    if macros == None:
+        try:
+            with open("macros.json", "r+") as file:
+                macros = json.load(file)
+        except:
+            with open("macros.json", "w+") as file:
+                macros = []
+                file.write("[]")
+
+    return macros
+
+
+def write_macros(_macros: list[dict[str]] = read_macros()):
+    global macros
+    macros = _macros
+    with open("macros.json", "w+") as file:
+        file.write(json.dumps(_macros))
+    macros
 
 
 def is_approximate_color(

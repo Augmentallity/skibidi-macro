@@ -6,6 +6,8 @@ import time
 import win32process
 import win32gui
 import menu
+import settings
+import in_game_macros
 
 DELAY = 0.128
 
@@ -29,6 +31,7 @@ EVENT_LISTENERS = [
     "Wave Start Button Listener",
     "Map Menu Listener",
 ]
+
 
 HWND = win32gui.GetForegroundWindow()
 
@@ -215,19 +218,20 @@ def main():
 
 
 def event_listener_macros():
-    m = menu.Menu()
+    m = menu.Menu("Event Listener Macros")
     m.header(
         "Event Listener Macros listen for events and respond to them when a corresponding event is detected via through pixel shown on screen.\nConfigure these to match with your system as these are necessary for your macros to work properly."
     )
-    for option in EVENT_LISTENERS:
-        m.item(menu.MenuItem(option, lambda: print("Ho")))
+    for i in range(len(EVENT_LISTENERS)):
+        m.item(menu.MenuItem(EVENT_LISTENERS[i], lambda: print("Ho")))
     m.show()
 
 
 if __name__ == "__main__":
     # main()
-    m = menu.Menu()
+    m = menu.Menu("Home")
     m.header("Configuration Tool for Anime Adventures Macros")
     m.item(menu.MenuItem("Event Listener Macros", event_listener_macros))
-    m.item(menu.MenuItem("In-Game Macros", lambda: print("a")))
+    m.item(menu.MenuItem("In-Game Macros", in_game_macros.main))
+    m.item(menu.MenuItem("Settings", settings.main))
     m.show()

@@ -14,9 +14,13 @@ def is_focused() -> bool:
 
 class MenuItem:
     def __init__(
-        self, name: Callable[[], str] | str, on_press: Callable[[], None]
+        self,
+        name: Callable[[], str] | str,
+        on_press: Callable[[], None] = lambda: None,
+        description: str | None = None,
     ) -> None:
         self._name = name
+        self._description = description
         self._on_press = on_press
 
 
@@ -24,8 +28,10 @@ stack = []
 
 
 class Menu:
+    TICK_RATE = 1 / 60
+
     def __init__(self, name: str) -> None:
-        self._items: list[MenuItem] = []
+        self._items: list[MenuItem | Callable[[], list[MenuItem]] | str] = []
         self._name = name
         self._idx: int = 0
         self._prev_idx: None | int = None
@@ -33,9 +39,12 @@ class Menu:
         self._prev_pressed: pynput.keyboard.Key | pynput.keyboard.KeyCode | None = None
         self._pressed: pynput.keyboard.Key | pynput.keyboard.KeyCode | None = None
 
-    def item(self, menu_item: MenuItem):
+    def item(self, menu_item: Callable[[], list[MenuItem]] | MenuItem):
         self._items.append(menu_item)
         return self
+
+    def text(self, text: str):
+        self._items.append(text)
 
     def header(self, description: str):
         self._description = description
@@ -64,13 +73,30 @@ class Menu:
         )
         kb_listener.start()
 
-        while True:
+        while stack[-1] == self:
             os.system("cls")
+            components: list[MenuItem | str] = []
             items: list[str] = []
-            for i in range(len(self._items)):
-                items.append(
-                    f"({'*' if i == self._idx else ' '}) {self._items[i]._name() if callable(self._items[i]._name) else self._items[i]._name}"
-                )
+            for i, menu_item in enumerate(self._items):
+                if callable(menu_item):
+                    menu_items = menu_item()
+                    if len(menu_items) > 0:
+                        components.extend(menu_items)
+                else:
+                    components.append(menu_item)
+
+            for i in range(len(components)):
+                if isinstance(components[i], MenuItem):
+                    items.append(
+                        f"({'*' if i == self._idx else ' '})\t{components[i]._name() if callable(components[i]._name) else components[i]._name}"
+                        + (
+                            f"\n\t- {components[i]._description}"
+                            if components[i]._description != None
+                            else ""
+                        )
+                    )
+                else:
+                    items.append(components[i])
 
             print(
                 "\n".join(
@@ -82,7 +108,6 @@ class Menu:
                         *items,
                         "",
                         "Press SPACE to interact, ESC to go back. Navigate using ↑ and ↓ keys",
-                        "",
                     ]
                 )
             )
@@ -92,11 +117,16 @@ class Menu:
                     case pynput.keyboard.Key.down:
                         if self._prev_pressed != pynput.keyboard.Key.down:
                             self._prev_pressed = pynput.keyboard.Key.down
-                            self.set_index(min(self._idx + 1, len(self._items) - 1))
+                            self.set_index(min(self._idx + 1, len(components) - 1))
                             prev_key_pressed = time.time()
                         elif time.time() - prev_key_pressed >= DELAY:
-                            self.set_index(min(self._idx + 1, len(self._items) - 1))
+                            self.set_index(min(self._idx + 1, len(components) - 1))
                             prev_key_pressed = time.time()
+                        if isinstance(components[self._idx], str):
+                            if self._idx + 1 >= len(components):
+                                self.set_index(0)
+                            else:
+                                self.set_index(self._idx + 1)
                     case pynput.keyboard.Key.up:
                         if self._prev_pressed != pynput.keyboard.Key.up:
                             self._prev_pressed = pynput.keyboard.Key.up
@@ -105,14 +135,16 @@ class Menu:
                         elif time.time() - prev_key_pressed >= DELAY:
                             self.set_index(max(self._idx - 1, 0))
                             prev_key_pressed = time.time()
-
+                        if isinstance(components[self._idx], str):
+                            if self._idx - 1 < 0:
+                                self.set_index(len(components) - 1)
+                            else:
+                                self.set_index(self._idx - 1)
                     case pynput.keyboard.Key.esc:
-                        if stack[-1] == self:
-                            stack.pop()
-                            return
+                        stack.pop()
+                        return
                     case pynput.keyboard.Key.space:
-                        if stack[-1] == self:
-                            self._prev_pressed = None
-                            self._pressed = None
-                            self._items[self._idx]._on_press()
-            time.sleep(1 / 30)
+                        self._prev_pressed = None
+                        self._pressed = None
+                        components[self._idx]._on_press()
+            time.sleep(Menu.TICK_RATE)
