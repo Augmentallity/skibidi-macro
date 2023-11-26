@@ -13,3 +13,4 @@ Bin
 pyvenv.cfg
 .venv
 pip-selfcheck.json
+macros.json
