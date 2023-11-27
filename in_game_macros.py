@@ -2,7 +2,8 @@ import os
 import threading
 import time
 from typing import Callable
-
+import win32con
+import win32gui
 import pyautogui
 from macro import MAPPED_TYPES, Macro_Type
 import macro_edit
@@ -11,6 +12,7 @@ import uuid
 import json
 import utils
 import pynput
+from pynput.keyboard import Key
 
 """
 {
@@ -226,7 +228,7 @@ def change_action_position(macro_id: str, macro_type: str):
         return
 
     if position < 1 or insert_at < 1:
-        print(f"Invalid position(s). Please enter a # between 1 and {n_2}")
+        print(f"Invalid position(s). Please enter a # between 1 and {seq_macros}")
         time.sleep(1)
         return
 
@@ -236,12 +238,73 @@ def change_action_position(macro_id: str, macro_type: str):
     macro[macro_type].insert(insert_at - 1, tmp)
 
 
+def test_macro_seq(macro_id: str, macro_seq: str):
+    macro = macro_edit.get_macro(macro_id)
+    sequence = macro[macro_seq]
+    keyboard = pynput.keyboard.Controller()
+    for macro_seq in sequence:
+        match macro_seq["type"]:
+            case Macro_Type.CLICK:
+                if macro_seq["roblox_bypass"]:
+                    win32gui.GetCursorInfo()
+
+                    def click(active: Callable[[], bool]):
+                        x, y = macro_seq["position"]
+                        while active():
+                            pyautogui.click(x, y)
+
+                    active = True
+                    t1 = threading.Thread(
+                        target=lambda: os.system('"%CD%/bin/mouse_movement.exe"')
+                    )
+                    t2 = threading.Thread(target=lambda: click(lambda: active))
+                    t1.start()
+                    t2.start()
+                    x, y = macro_seq["position"]
+                    s = time.perf_counter()
+                    cursor_state_pointer = win32gui.LoadCursor(0, win32con.IDC_HAND)
+                    while True:
+                        cursor_state = win32gui.GetCursorInfo()[1]
+                        if not t1.is_alive():
+                            t1 = threading.Thread(
+                                target=lambda: os.system(
+                                    '"%CD%/bin/mouse_movement.exe"'
+                                )
+                            )
+                            t1.start()
+
+                        if cursor_state >= cursor_state_pointer:  # issue
+                            active = False
+                            pyautogui.click(x, y)
+                            break
+                        if time.perf_counter() - s >= 5:
+                            active = False
+                            break
+
+                else:
+                    pyautogui.click(macro_seq["position"][0], macro_seq["position"][1])
+            case Macro_Type.WAIT:
+                time.sleep(macro_seq["ms"] / 1000)
+            case Macro_Type.WAIT_CONDITIONALLY:
+                x, y = macro_seq["position"]
+                color = macro_seq["color"]
+                while not pyautogui.pixelMatchesColor(x, y, color):
+                    pass
+            case Macro_Type.KEY_DOWN:
+                keyboard.press(eval(macro_seq["key"]))
+            case Macro_Type.KEY_UP:
+                keyboard.release(eval(macro_seq["key"]))
+            case Macro_Type.KEY_PRESS:
+                keyboard.tap(eval(macro_seq["key"]))
+
+
 def macro_editor(props: dict[str]):
     name = props["name"]
     id = props["id"]
     m = menu.Menu(f"Macro Editor: {name}")
-    m.item(menu.MenuItem(f"Delete {name}", lambda: delete_macro(id)))
+    m.item(menu.MenuItem(f"Delete name", lambda: delete_macro(id)))
     m.item(menu.MenuItem(f"Change name", lambda: edit_macro_name(id)))
+    m.item(menu.MenuItem(f"Test macro", lambda: test_macro_seq(id, "lobby_sequence")))
     m.text("=== Lobby (Pre-Game) ===")
     m.item(
         menu.MenuItem("Add Action", lambda: add_sequence_macro(id, "lobby_sequence"))
@@ -255,7 +318,9 @@ def macro_editor(props: dict[str]):
             ),
         )
     )
+    m.text("")
     m.item(lambda: list_sequence_macros(id, "lobby_sequence"))
+    m.text("")
     m.text("=== In-Game ===")
     m.item(
         menu.MenuItem("Add Action", lambda: add_sequence_macro(id, "ingame_sequence"))

@@ -32,28 +32,49 @@ DEFAULT_CONFIG = {
     f"{NORMAL_CAMERA_ANGLE_INDICATOR}_color": (16, 71, 132),
 }
 
+config: dict[str] = None
 
-def merge_with_default_config(config: dict[str, any]):
+
+def merge_with_default_config():
+    global config
     for key in DEFAULT_CONFIG:
         if key not in config:
             config[key] = DEFAULT_CONFIG[key]
 
 
 def read_config() -> dict[str, any]:
-    try:
-        file = open("animeadventures.config", "r+")
-        config = {}
-        for line in file:
-            (prop, value) = line.split("=")
-            config[prop] = eval(value)
-        merge_with_default_config(config)
-        return config
-    except:
-        save_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG
+    global config
+    if config == None:
+        try:
+            file = open("animeadventures.config", "r+")
+            config = {}
+            for line in file:
+                (prop, value) = line.split("=")
+                config[prop] = eval(value)
+            merge_with_default_config()
+        except:
+            config = DEFAULT_CONFIG
+    return config
 
 
-def save_config(config: dict[str, str]):
+def get_config_prop(prop: str) -> tuple[tuple[int, int], tuple[int, int, int]]:
+    global config
+    if config == None:
+        read_config()
+
+    return (config[f"{prop}_pos"], config[f"{prop}_color"])
+
+
+def set_config_prop(prop: str, position: tuple[int, int], color: tuple[int, int, int]):
+    global config
+    if config == None:
+        read_config()
+    config[f"{prop}_pos"] = position
+    config[f"{prop}_color"] = color
+    save_config()
+
+
+def save_config(config: dict[str, str] = read_config()):
     file = open("animeadventures.config", "w+")
     contents = []
     for key, value in config.items():

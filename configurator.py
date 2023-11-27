@@ -8,6 +8,7 @@ import win32gui
 import menu
 import settings
 import in_game_macros
+import event_listeners
 
 DELAY = 0.128
 
@@ -22,14 +23,6 @@ OPTIONS = [
     "Set DISCONNECTED DIALOG BOX",
     "Set NORMAL CAMERA ANGLE DETECTION",
     "Configure EXITING MODE",
-]
-
-EVENT_LISTENERS = [
-    "Disconnected Listener",
-    "Game Lost Listener",
-    "Wave Completed Listener",
-    "Wave Start Button Listener",
-    "Map Menu Listener",
 ]
 
 
@@ -217,21 +210,11 @@ def main():
                 break
 
 
-def event_listener_macros():
-    m = menu.Menu("Event Listener Macros")
-    m.header(
-        "Event Listener Macros listen for events and respond to them when a corresponding event is detected via through pixel shown on screen.\nConfigure these to match with your system as these are necessary for your macros to work properly."
-    )
-    for i in range(len(EVENT_LISTENERS)):
-        m.item(menu.MenuItem(EVENT_LISTENERS[i], lambda: print("Ho")))
-    m.show()
-
-
 if __name__ == "__main__":
     # main()
     m = menu.Menu("Home")
     m.header("Configuration Tool for Anime Adventures Macros")
-    m.item(menu.MenuItem("Event Listener Macros", event_listener_macros))
+    m.item(menu.MenuItem("Event Listener Macros", event_listeners.main))
     m.item(menu.MenuItem("In-Game Macros", in_game_macros.main))
     m.item(menu.MenuItem("Settings", settings.main))
     m.show()

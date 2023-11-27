@@ -1,3 +1,4 @@
+import threading
 from typing import Callable
 import win32gui
 import pynput
@@ -31,7 +32,9 @@ class Menu:
     TICK_RATE = 1 / 60
 
     def __init__(self, name: str) -> None:
-        self._items: list[MenuItem | Callable[[], list[MenuItem]] | str] = []
+        self._items: list[
+            MenuItem | Callable[[], list[MenuItem]] | str | Callable[[], str]
+        ] = []
         self._name = name
         self._idx: int = 0
         self._prev_idx: None | int = None
@@ -43,7 +46,7 @@ class Menu:
         self._items.append(menu_item)
         return self
 
-    def text(self, text: str):
+    def text(self, text: str | Callable[[], str]):
         self._items.append(text)
 
     def header(self, description: str):
@@ -80,10 +83,23 @@ class Menu:
             for i, menu_item in enumerate(self._items):
                 if callable(menu_item):
                     menu_items = menu_item()
-                    if len(menu_items) > 0:
+                    if type(menu_items) == str:
+                        components.append(menu_items)
+                    elif type(menu_items) == list and len(menu_items) > 0:
                         components.extend(menu_items)
                 else:
                     components.append(menu_item)
+
+            while type(components[self._idx]) == str:
+                match self._pressed:
+                    case pynput.keyboard.Key.down:
+                        if self._idx < len(components) - 1:
+                            self.set_index(self._idx + 1)
+                    case pynput.keyboard.Key.up:
+                        if self._idx > 0:
+                            self.set_index(self._idx - 1)
+                    case _:
+                        self.set_index(self._idx + 1)
 
             for i in range(len(components)):
                 if isinstance(components[i], MenuItem):
@@ -117,29 +133,44 @@ class Menu:
                     case pynput.keyboard.Key.down:
                         if self._prev_pressed != pynput.keyboard.Key.down:
                             self._prev_pressed = pynput.keyboard.Key.down
-                            self.set_index(min(self._idx + 1, len(components) - 1))
-                            prev_key_pressed = time.time()
-                        elif time.time() - prev_key_pressed >= DELAY:
-                            self.set_index(min(self._idx + 1, len(components) - 1))
-                            prev_key_pressed = time.time()
-                        if isinstance(components[self._idx], str):
-                            if self._idx + 1 >= len(components):
+                            if self._idx >= len(components) - 1:
                                 self.set_index(0)
                             else:
                                 self.set_index(self._idx + 1)
+                            prev_key_pressed = time.time()
+                        elif time.time() - prev_key_pressed >= DELAY:
+                            if self._idx >= len(components) - 1:
+                                self.set_index(0)
+                            else:
+                                self.set_index(self._idx + 1)
+                            prev_key_pressed = time.time()
+                        while type(components[self._idx]) == str:
+                            if self._idx >= len(components) - 1:
+                                self.set_index(0)
+                            else:
+                                self.set_index(self._idx + 1)
+
                     case pynput.keyboard.Key.up:
                         if self._prev_pressed != pynput.keyboard.Key.up:
                             self._prev_pressed = pynput.keyboard.Key.up
-                            self.set_index(max(self._idx - 1, 0))
-                            prev_key_pressed = time.time()
-                        elif time.time() - prev_key_pressed >= DELAY:
-                            self.set_index(max(self._idx - 1, 0))
-                            prev_key_pressed = time.time()
-                        if isinstance(components[self._idx], str):
-                            if self._idx - 1 < 0:
+                            if self._idx <= 0:
                                 self.set_index(len(components) - 1)
                             else:
                                 self.set_index(self._idx - 1)
+                            prev_key_pressed = time.time()
+                        elif time.time() - prev_key_pressed >= DELAY:
+                            if self._idx <= 0:
+                                self.set_index(len(components) - 1)
+                            else:
+                                self.set_index(self._idx - 1)
+                            prev_key_pressed = time.time()
+
+                        while type(components[self._idx]) == str:
+                            if self._idx <= 0:
+                                self.set_index(len(components) - 1)
+                            else:
+                                self.set_index(self._idx - 1)
+
                     case pynput.keyboard.Key.esc:
                         stack.pop()
                         return
