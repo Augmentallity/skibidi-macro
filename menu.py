@@ -29,7 +29,7 @@ stack = []
 
 
 class Menu:
-    TICK_RATE = 1 / 60
+    TICK_RATE = 1 / 15
 
     def __init__(self, name: str) -> None:
         self._items: list[
