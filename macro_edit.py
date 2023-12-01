@@ -495,7 +495,10 @@ def tiny_task_macro(
 
     def delete():
         delete_seq_macro(macro_id, macro_type, _id)
-        os.remove(f"{os.getcwd()}\\macros\\{macro_id}\\{file_name}")
+        try:
+            os.remove(f"{os.getcwd()}\\macros\\{macro_id}\\{file_name}")
+        except:
+            pass
 
     m.item(menu.MenuItem("Save Changes", save_changes))
     if seq_macro != None:

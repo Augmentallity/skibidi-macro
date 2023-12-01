@@ -13,6 +13,7 @@ def delete_seq_macro(macro_id: str, macro_seq_name: str, _id: str):
         i += 1
 
     del macro[macro_seq_name][i]
+    utils.write_macros()
     on_macro_change(macro_id, macro_seq_name)
     menu.stack.pop()
 
