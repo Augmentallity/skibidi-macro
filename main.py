@@ -105,7 +105,28 @@ def main():
     run_till_start_of_wave = config["waves_per_run"] + 1
     avg_run_time: int = 0
     should_stop_timer = False
+    should_detect_loss = True
+    game_loss = False
     logs: list[str] = []
+
+    def loss_detector():
+        nonlocal game_loss
+        nonlocal should_detect_loss
+        while should_detect_loss and not game_loss:
+            color1 = pyautogui.pixel(
+                config[f"{utils.DEFEAT_LABEL}_pos"][0],
+                config[f"{utils.DEFEAT_LABEL}_pos"][1],
+            )
+            color2 = pyautogui.pixel(
+                config[f"{utils.HP_BAR_ZERO}_pos"][0],
+                config[f"{utils.HP_BAR_ZERO}_pos"][1],
+            )
+            if (
+                color1 == config[f"{utils.DEFEAT_LABEL}_color"]
+                and color2 == config[f"{utils.HP_BAR_ZERO}_color"]
+            ):
+                game_loss = True
+                should_detect_loss = False
 
     t1 = threading.Thread(
         target=timer,
@@ -117,12 +138,17 @@ def main():
             lambda: logs,
         ),
     )
+
     t1.start()
 
     def execute_run(skip_joining_private_server: bool):
         global runs
         nonlocal avg_run_time
         nonlocal logs
+        nonlocal game_loss
+        nonlocal should_detect_loss
+        should_detect_loss = True
+        game_loss = False
         config = utils.read_config()
 
         while True:
@@ -263,8 +289,10 @@ def main():
             # Listen for wave completions
             wave = 1
             files = os.listdir(f"./wave_events/{macro_parent_folder}")
+            t2 = threading.Thread(target=loss_detector)
+            t2.start()
 
-            while True:
+            while not game_loss:
                 listeners()
                 color = pyautogui.pixel(
                     config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][0],
@@ -302,6 +330,7 @@ def main():
                     s = time.perf_counter()
                     while time.perf_counter() - s <= 5:
                         detect_stop()
+            detect_loss()
 
     def detect_stop():
         nonlocal should_stop_timer
@@ -366,17 +395,8 @@ def main():
         global losses
         nonlocal avg_run_time
         nonlocal logs
-        color1 = pyautogui.pixel(
-            config[f"{utils.DEFEAT_LABEL}_pos"][0],
-            config[f"{utils.DEFEAT_LABEL}_pos"][1],
-        )
-        color2 = pyautogui.pixel(
-            config[f"{utils.HP_BAR_ZERO}_pos"][0], config[f"{utils.HP_BAR_ZERO}_pos"][1]
-        )
-        if (
-            color1 == config[f"{utils.DEFEAT_LABEL}_color"]
-            and color2 == config[f"{utils.HP_BAR_ZERO}_color"]
-        ):
+        nonlocal game_loss
+        if game_loss:
             end_time = time.perf_counter()
             logs.append("\tLoss detected. Redoing run...")
             runs.append(end_time)
