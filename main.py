@@ -364,6 +364,7 @@ def main():
     def detect_loss():
         global runs
         global losses
+        nonlocal avg_run_time
         nonlocal logs
         color1 = pyautogui.pixel(
             config[f"{utils.DEFEAT_LABEL}_pos"][0],
@@ -376,10 +377,12 @@ def main():
             color1 == config[f"{utils.DEFEAT_LABEL}_color"]
             and color2 == config[f"{utils.HP_BAR_ZERO}_color"]
         ):
+            end_time = time.perf_counter()
             logs.append("\tLoss detected. Redoing run...")
-            runs += 1
+            runs.append(end_time)
+            avg_run_time += end_time
             losses += 1
-            os.system("%CD%/bin/closegame.exe")
+            os.system('"%CD%/bin/closegame.exe"')
             execute_run(False)
 
     def listeners():
