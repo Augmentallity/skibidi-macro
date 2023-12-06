@@ -12,6 +12,9 @@ import utils
 import pynput
 from pynput.keyboard import Key
 import shutil
+import cam_editor
+import win32gui
+import win32con
 
 
 def create_macro():
@@ -208,8 +211,9 @@ def change_action_position(macro_id: str, macro_type: str):
     utils.write_macros()
 
 
-def test_macro_seq(sequence: list[dict[str]], macro_id: str):
+def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False):
     keyboard = pynput.keyboard.Controller()
+    config = utils.read_config()
 
     def set_should_exit(key: pynput.keyboard.Key):
         nonlocal should_exit
@@ -220,12 +224,19 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str):
     should_exit = False
     listener.start()
 
+    dirs = [
+        path
+        for path in os.listdir(f"{os.getcwd()}\\macros\\{macro_id}")
+        if os.path.isdir(f"{os.getcwd()}\\macros\\{macro_id}\\{path}")
+    ]
+
     for i, macro_seq in enumerate(sequence):
         if should_exit:
             break
         match macro_seq["type"]:
             case Macro_Type.TINY_TASK:
-                os.system(f'"%CD%"\\macros\\{macro_id}\\{i + 1}.exe')
+                os.system(f'"%CD%/macros/{macro_id}/{i + 1}.exe"')
+                print(f"completed {i + 1}.exe")
             case Macro_Type.CLICK:
                 pyautogui.click(macro_seq["position"][0], macro_seq["position"][1])
             case Macro_Type.WAIT:
@@ -248,7 +259,42 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str):
                     start, end = macro_seq["lines"]
                     lines = sequence[start - 1 : end]
                     while time.perf_counter() - s <= seconds:
-                        test_macro_seq(lines, macro_id)
+                        test_macro_seq(lines, macro_id, True)
+    if sequence_only:
+        return
+
+    found_cam_angle_name = None
+    while not should_exit and found_cam_angle_name == None:
+        for cam_angle in dirs:
+            if cam_editor.compare_to(macro_id, cam_angle) >= cam_editor.SIMILARITY:
+                found_cam_angle_name = cam_angle
+                break
+    disconnected = False
+    current_wave = 1
+    while not should_exit and not disconnected:
+        x, y = config[f"{utils.START_WAVE_BTN}_pos"]
+        color = config[f"{utils.START_WAVE_BTN}_color"]
+        if pyautogui.pixelMatchesColor(x, y, color):
+            os.system('"%CD%/bin/clickwavestart.exe"')
+            break
+    while not should_exit and not disconnected:
+        x, y = config[f"{utils.WAVE_COMPLETED_LABEL}_pos"]
+        color = config[f"{utils.WAVE_COMPLETED_LABEL}_color"]
+        if pyautogui.pixelMatchesColor(x, y, color):
+            current_wave += 1
+            if current_wave == config["waves_per_run"]:
+                hwnd = win32gui.FindWindow(None, "Roblox")
+                win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                return
+            path = f"{os.getcwd()}\\macros\\{macro_id}\\{found_cam_angle_name}\\{current_wave}"
+            if os.path.exists(path):
+                for executable in os.listdir(path):
+                    os.system(
+                        f'"%CD%/macros/{macro_id}/{found_cam_angle_name}/{current_wave}/{executable}'
+                    )
+            else:
+                print(f"No macros found for wave {current_wave}")
+            time.sleep(5)
 
 
 def macro_editor(props: dict[str]):
@@ -280,8 +326,20 @@ def macro_editor(props: dict[str]):
     m.item(lambda: list_sequence_macros(id, "lobby_sequence"))
     m.text("")
     m.text("=== In-Game ===")
-    m.item(menu.MenuItem("Add Camera Angle"))
-    m.item(lambda: list_sequence_macros(id, "ingame_sequence"))
+    m.item(menu.MenuItem("Add Camera Angle", lambda: cam_editor.camera_edit(id)))
+
+    def camera_angles():
+        dirs = [
+            path
+            for path in os.listdir(f"{os.getcwd()}\\macros\\{id}")
+            if os.path.isdir(f"{os.getcwd()}\\macros\\{id}\\{path}")
+        ]
+        return [
+            menu.MenuItem(x, (lambda x: lambda: cam_editor.camera_edit(id, x))(x))
+            for x in dirs
+        ]
+
+    m.item(camera_angles)
     m.show()
 
 
