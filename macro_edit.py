@@ -480,7 +480,7 @@ def tiny_task_macro(
         lambda: [
             menu.MenuItem(
                 "Execute tiny task macro",
-                lambda: os.system(f'"%CD%\\macros\\{macro_id}\\{i}.exe"'),
+                lambda: os.system(f'"%CD%/macros/{macro_id}/{i}.exe"'),
             )
         ]
         if file_name != None
