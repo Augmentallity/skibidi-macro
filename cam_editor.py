@@ -1,3 +1,5 @@
+import shutil
+from typing import Callable
 import menu
 import win32gui
 import win32ui
@@ -35,9 +37,9 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
     listening = True
     screenshot_taken = False
 
-    def similarity_listener():
+    def similarity_listener(listening: Callable[[], bool]):
         nonlocal similarity
-        while listening:
+        while listening():
             hwnd = win32gui.FindWindow(None, "Roblox")
             if hwnd == 0 or bmp_file == None:
                 similarity = 0
@@ -75,7 +77,7 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
         if key == pynput.keyboard.Key.backspace:
             capture()
 
-    t = threading.Thread(target=similarity_listener)
+    t = threading.Thread(target=similarity_listener, args=(lambda: listening,))
     keyboard_listener = pynput.keyboard.Listener(on_press=screenshot_key_listener)
     t.start()
     keyboard_listener.start()
@@ -104,6 +106,16 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
             return [menu.MenuItem(f"View screenshot", lambda: bmp_file.show())]
         return []
 
+    def delete_cam_angle():
+        confirmation = input("Type DELETE to confirm: ").strip()
+        if confirmation == "DELETE":
+            try:
+                shutil.rmtree(f"./macros/{macro_id}/{cam_name}")
+                menu.stack.pop()
+            except:
+                print("The operation failed.")
+                time.sleep(1)
+
     m = menu.Menu("Add Camera Angle")
     m.header(
         "Maps have different camera angles. To differentiate camera angles,\nthe program needs to capture a screenshot of roblox."
@@ -111,9 +123,20 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
     m.text("")
     m.text(compare)
     m.text("")
-    m.item(menu.MenuItem(lambda: f"Camera Angle Name): {cam_name}", change_name))
-    m.item(menu.MenuItem("Screenshot Roblox (press BACKSPACE)", capture))
+    m.item(menu.MenuItem(lambda: f"Camera Angle Name: {cam_name}", change_name))
+    m.item(
+        lambda: (
+            [menu.MenuItem("Screenshot Roblox (press BACKSPACE)", capture)]
+            if cam_name
+            else []
+        )
+    )
     m.item(view_screenshot)
+    m.item(
+        lambda: (
+            [menu.MenuItem("Delete Camera Angle", delete_cam_angle)] if cam_name else []
+        )
+    )
     m.item(menu.MenuItem("Back", lambda: menu.stack.pop()))
     m.text("")
     m.text(lambda: "Screenshot taken!" if screenshot_taken else "")
