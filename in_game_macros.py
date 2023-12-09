@@ -36,10 +36,16 @@ def create_macro():
 
 def list_macros():
     macros = utils.read_macros()
+    config = utils.read_config()
     r = []
     for x in macros:
         callback = (lambda y: (lambda: macro_editor(y)))(x)
-        r.append(menu.MenuItem(x["name"], callback))
+        r.append(
+            menu.MenuItem(
+                x["name"] + (" (ACTIVE)" if config["active_macro"] == x["id"] else ""),
+                callback,
+            )
+        )
     return r
 
 
@@ -297,10 +303,32 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False
             time.sleep(5)
 
 
+def set_as_active_macro(macro_id: str):
+    config = utils.read_config()
+    config["active_macro"] = macro_id
+    utils.save_config()
+
+
 def macro_editor(props: dict[str]):
     name = props["name"]
     id = props["id"]
     m = menu.Menu(f"Macro Editor: {name}")
+
+    def display_set_macro_active():
+        config = utils.read_config()
+        is_active = config["active_macro"] == id
+        return (
+            [menu.MenuItem("Set as active macro", lambda: set_as_active_macro(id))]
+            if not is_active
+            else []
+        )
+
+    def is_macro_active():
+        config = utils.read_config()
+        is_active = config["active_macro"] == id
+        return "This macro is ACTIVE\n" if is_active else ""
+
+    m.text(is_macro_active)
     m.item(menu.MenuItem(f"Delete name", lambda: delete_macro(id)))
     m.item(menu.MenuItem(f"Change name", lambda: edit_macro_name(id)))
     m.item(
@@ -309,6 +337,7 @@ def macro_editor(props: dict[str]):
             lambda: test_macro_seq(macro_utils.get_macro(id)["lobby_sequence"], id),
         )
     )
+    m.item(display_set_macro_active)
     m.text("=== Lobby (Pre-Game) ===")
     m.item(
         menu.MenuItem("Add Action", lambda: add_sequence_macro(id, "lobby_sequence"))

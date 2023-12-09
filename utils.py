@@ -12,6 +12,7 @@ NORMAL_CAMERA_ANGLE_INDICATOR = "normal_camera_detector"
 
 DEFAULT_CONFIG = {
     "waves_per_run": 10,
+    "active_macro": "",
     f"{LOBBY_PLAY_BTN_PROP}_pos": (160, 497),
     f"{LOBBY_PLAY_BTN_PROP}_color": (32, 242, 235),
     f"{CANCEL_MAP_BTN}_pos": (961, 878),
@@ -50,7 +51,10 @@ def read_config() -> dict[str, any]:
             config = {}
             for line in file:
                 (prop, value) = line.split("=")
-                config[prop] = eval(value)
+                try:
+                    config[prop] = eval(value)
+                except:
+                    config[prop] = value.strip()
             merge_with_default_config()
         except:
             config = DEFAULT_CONFIG
