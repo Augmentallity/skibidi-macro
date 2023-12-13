@@ -1,7 +1,9 @@
 import os
+import threading
 import time
 from typing import Callable
 import pyautogui
+from event_listeners import EVENT_LISTENERS_MAPPED
 from macro import Macro_Type, get_seq_macro_str
 import macro_utils
 import macro_edit
@@ -15,6 +17,7 @@ import shutil
 import cam_editor
 import win32gui
 import win32con
+import macro_presets
 
 
 def create_macro():
@@ -26,9 +29,9 @@ def create_macro():
         macros.append(
             {
                 "name": name,
+                "waves": 10,
                 "id": _id,
                 "lobby_sequence": [],
-                "ingame_sequence": [],
             }
         )  # changeable
         utils.write_macros(macros)
@@ -36,13 +39,12 @@ def create_macro():
 
 def list_macros():
     macros = utils.read_macros()
-    config = utils.read_config()
     r = []
     for x in macros:
         callback = (lambda y: (lambda: macro_editor(y)))(x)
         r.append(
             menu.MenuItem(
-                x["name"] + (" (ACTIVE)" if config["active_macro"] == x["id"] else ""),
+                x["name"],
                 callback,
             )
         )
@@ -121,6 +123,10 @@ def edit_sequence_macro(macro: dict[str], macro_id: str, macro_type: str):
             callback(macro_edit.repeat_lines)
         case Macro_Type.TINY_TASK:
             callback(macro_edit.tiny_task_macro)
+        case Macro_Type.GLOBAL_TINY_TASK:
+            callback(macro_edit.bin_macro)
+        case Macro_Type.LISTENER:
+            callback(macro_edit.event_listener)
 
 
 def add_sequence_macro(macro_id: str, macro_type: str):
@@ -189,6 +195,20 @@ def add_sequence_macro(macro_id: str, macro_type: str):
             description="Uses a tiny task macro",
         )
     )
+    m.item(
+        menu.MenuItem(
+            "Tiny Task (/bin) Macro",
+            lambda: macro_edit.bin_macro(macro_id, macro_type),
+            description="Uses a tiny task macro in the bin folder. Also known as a global macro.",
+        )
+    )
+    m.item(
+        menu.MenuItem(
+            "Event Listener",
+            lambda: macro_edit.event_listener(macro_id, macro_type),
+            description='A listener is simply a global version of the "Wait (condition)". These are configurable under Event Listeners.',
+        )
+    )
     m.show()
 
 
@@ -217,7 +237,12 @@ def change_action_position(macro_id: str, macro_type: str):
     utils.write_macros()
 
 
-def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False):
+def test_macro_seq(
+    sequence: list[dict[str]],
+    macro_id: str,
+    sequence_only=False,
+    is_disconnected: Callable[[], bool] | None = None,
+):
     keyboard = pynput.keyboard.Controller()
     config = utils.read_config()
 
@@ -235,22 +260,91 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False
         for path in os.listdir(f"{os.getcwd()}\\macros\\{macro_id}")
         if os.path.isdir(f"{os.getcwd()}\\macros\\{macro_id}\\{path}")
     ]
+    disconnected = is_disconnected() if is_disconnected else False
+
+    def get_is_disconnected():
+        return is_disconnected() if is_disconnected else disconnected
+
+    if not sequence_only:
+        listening = True
+
+        def detect_disconnection(listening: Callable[[], bool]):
+            nonlocal disconnected
+            while listening() and not get_is_disconnected():
+                hwnd = win32gui.FindWindow(None, "Roblox")
+                pos, color = utils.get_config_prop(utils.DISCONNECTED_DIALOG_BOX)
+                x, y = pos
+                if (
+                    pyautogui.pixelMatchesColor(x, y, color)
+                    and hwnd == win32gui.GetForegroundWindow()
+                ):
+                    time.sleep(5)
+                    if (
+                        pyautogui.pixelMatchesColor(x, y, color)
+                        and hwnd == win32gui.GetForegroundWindow()
+                    ):
+                        win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                        disconnected = lambda: True
+                        return
+
+        t1 = threading.Thread(target=detect_disconnection, args=(lambda: listening,))
+        t1.start()
 
     for i, macro_seq in enumerate(sequence):
-        if should_exit:
+        if should_exit or get_is_disconnected():
             break
         match macro_seq["type"]:
             case Macro_Type.TINY_TASK:
                 os.system(f'"%CD%/macros/{macro_id}/{i + 1}.exe"')
-                print(f"completed {i + 1}.exe")
             case Macro_Type.CLICK:
                 pyautogui.click(macro_seq["position"][0], macro_seq["position"][1])
+                if macro_seq["should_fullscreen_roblox"]:
+                    while True:
+                        hwnd = win32gui.FindWindow(None, "Roblox")
+                        if hwnd != 0:
+                            win32gui.ShowWindow(
+                                win32gui.FindWindow(None, "Roblox"), win32con.SW_RESTORE
+                            )
+                            win32gui.SetWindowPos(
+                                hwnd,
+                                win32con.HWND_NOTOPMOST,
+                                0,
+                                0,
+                                0,
+                                0,
+                                win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
+                            )
+                            win32gui.SetWindowPos(
+                                hwnd,
+                                win32con.HWND_TOPMOST,
+                                0,
+                                0,
+                                0,
+                                0,
+                                win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
+                            )
+                            win32gui.SetWindowPos(
+                                hwnd,
+                                win32con.HWND_NOTOPMOST,
+                                0,
+                                0,
+                                0,
+                                0,
+                                win32con.SWP_SHOWWINDOW
+                                + win32con.SWP_NOMOVE
+                                + win32con.SWP_NOSIZE,
+                            )
+                            break
             case Macro_Type.WAIT:
                 time.sleep(macro_seq["ms"] / 1000)
             case Macro_Type.WAIT_CONDITIONALLY:
                 x, y = macro_seq["position"]
                 color = macro_seq["color"]
-                while not pyautogui.pixelMatchesColor(x, y, color) and not should_exit:
+                while (
+                    not pyautogui.pixelMatchesColor(x, y, color)
+                    and not should_exit
+                    and not get_is_disconnected()
+                ):
                     pass
             case Macro_Type.KEY_DOWN:
                 keyboard.press(eval(macro_seq["key"]))
@@ -265,21 +359,53 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False
                     start, end = macro_seq["lines"]
                     lines = sequence[start - 1 : end]
                     while time.perf_counter() - s <= seconds:
-                        test_macro_seq(lines, macro_id, True)
-    if sequence_only:
+                        test_macro_seq(lines, macro_id, True, lambda: disconnected)
+            case Macro_Type.GLOBAL_TINY_TASK:
+                os.system(f'"%CD%/bin/{macro_seq["file_name"]}"')
+            case Macro_Type.LISTENER:
+                pos, color = utils.get_config_prop(
+                    EVENT_LISTENERS_MAPPED[macro_seq["name"]]
+                )
+                x, y = pos
+                while (
+                    not pyautogui.pixelMatchesColor(x, y, color)
+                    and not should_exit
+                    and not get_is_disconnected()
+                ):
+                    pass
+    if sequence_only or get_is_disconnected():
         return
 
     found_cam_angle_name = None
-    while not should_exit and found_cam_angle_name == None:
+    s = time.perf_counter()
+    e = s
+    while (
+        not should_exit
+        and found_cam_angle_name == None
+        and e - s <= 10
+        and len(dirs) > 0
+    ):
+        e = time.perf_counter()
         for cam_angle in dirs:
             if cam_editor.compare_to(macro_id, cam_angle) >= cam_editor.SIMILARITY:
                 found_cam_angle_name = cam_angle
                 break
-    disconnected = False
+    if len(dirs) == 0:
+        print(
+            "No camera angles are present. Outside of testing mode, starting the wave will happen immediately."
+        )
+    if e - s >= 10:
+        print(
+            "Could not find camera angle. Outside of testing mode, starting the wave will happen immediately."
+        )
+    if found_cam_angle_name != None:
+        print(f"Detected camera angle: {found_cam_angle_name}")
+
     current_wave = 1
     while not should_exit and not disconnected:
         x, y = config[f"{utils.START_WAVE_BTN}_pos"]
         color = config[f"{utils.START_WAVE_BTN}_color"]
+
         if pyautogui.pixelMatchesColor(x, y, color):
             os.system('"%CD%/bin/clickwavestart.exe"')
             break
@@ -288,19 +414,21 @@ def test_macro_seq(sequence: list[dict[str]], macro_id: str, sequence_only=False
         color = config[f"{utils.WAVE_COMPLETED_LABEL}_color"]
         if pyautogui.pixelMatchesColor(x, y, color):
             current_wave += 1
-            if current_wave == config["waves_per_run"]:
+            if current_wave >= config["waves_per_run"]:
                 hwnd = win32gui.FindWindow(None, "Roblox")
                 win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
                 return
             path = f"{os.getcwd()}\\macros\\{macro_id}\\{found_cam_angle_name}\\{current_wave}"
             if os.path.exists(path):
-                for executable in os.listdir(path):
+                macros_in_wave = os.listdir(path)
+                for executable in macros_in_wave:
                     os.system(
-                        f'"%CD%/macros/{macro_id}/{found_cam_angle_name}/{current_wave}/{executable}'
+                        f'"%CD%/macros/{macro_id}/{found_cam_angle_name}/{current_wave}/{executable}"'
                     )
             else:
                 print(f"No macros found for wave {current_wave}")
             time.sleep(5)
+    listening = False
 
 
 def set_as_active_macro(macro_id: str):
@@ -309,39 +437,43 @@ def set_as_active_macro(macro_id: str):
     utils.save_config()
 
 
+def change_waves_per_run(macro_id: str):
+    val = input("Set waves per run: ").strip()
+    if len(val) > 0 and val.isnumeric():
+        macro_edit.get_macro(macro_id)["waves"] = int(val)
+        utils.write_macros()
+
+
 def macro_editor(props: dict[str]):
     name = props["name"]
     id = props["id"]
     m = menu.Menu(f"Macro Editor: {name}")
 
-    def display_set_macro_active():
-        config = utils.read_config()
-        is_active = config["active_macro"] == id
-        return (
-            [menu.MenuItem("Set as active macro", lambda: set_as_active_macro(id))]
-            if not is_active
-            else []
+    m.item(menu.MenuItem(f"Delete macro", lambda: delete_macro(id)))
+    m.item(menu.MenuItem(f"Change macro name", lambda: edit_macro_name(id)))
+    m.item(
+        menu.MenuItem(
+            f"Open macro directory",
+            lambda: os.system(f'explorer.exe "{os.getcwd()}\\macros\\{id}'),
         )
-
-    def is_macro_active():
-        config = utils.read_config()
-        is_active = config["active_macro"] == id
-        return "This macro is ACTIVE\n" if is_active else ""
-
-    m.text(is_macro_active)
-    m.item(menu.MenuItem(f"Delete name", lambda: delete_macro(id)))
-    m.item(menu.MenuItem(f"Change name", lambda: edit_macro_name(id)))
+    )
+    m.item(
+        menu.MenuItem(
+            lambda: f"Change waves per run (current: {props['waves']})",
+            lambda: change_waves_per_run(id),
+        )
+    )
     m.item(
         menu.MenuItem(
             f"Test macro",
             lambda: test_macro_seq(macro_utils.get_macro(id)["lobby_sequence"], id),
         )
     )
-    m.item(display_set_macro_active)
     m.text("=== Lobby (Pre-Game) ===")
     m.item(
         menu.MenuItem("Add Action", lambda: add_sequence_macro(id, "lobby_sequence"))
     )
+    m.item(menu.MenuItem("Use preset", lambda: macro_presets.main(id)))
     m.item(
         menu.MenuItem(
             "Change Action Position #",

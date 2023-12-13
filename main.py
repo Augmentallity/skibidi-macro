@@ -1,4 +1,6 @@
 import threading
+from event_listeners import EVENT_LISTENERS_MAPPED
+from macro import Macro_Type
 import utils
 import pyautogui
 import keyboard
@@ -8,410 +10,424 @@ import os
 import win32gui
 import win32con
 from typing import Callable
-from configurator import is_focused
+from pynput.keyboard import Key
+import pydirectinput
+import macro_edit
+import menu
+import cam_editor
+import keyboard
+import traceback
 
 
-def windowEnumerationHandler(hwnd, top_windows):
-    top_windows.append((hwnd, win32gui.GetWindowText(hwnd)))
+def close_roblox():
+    hwnd = win32gui.FindWindow(None, "Roblox")
+    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
 
 
-runs: list[float] = []
-losses = 0
-disconnections = 0
-UPDATE_RATE = 1 / 3
+def to_date(f: float):
+    s = int(f)
+    seconds = s % 60
+    minutes = (s % 3600) // 60
+    hours = (s % 86400) // 3600
+    return f"{hours}h {minutes}m {seconds}s"
 
 
-def run_macro(path: str, autofocus: bool = True):
-    if autofocus:
-        roblox = win32gui.FindWindow(None, "Roblox")
-        pyautogui.press("alt")
-        win32gui.SetForegroundWindow(roblox)
-
-    os.system(path)
-
-
-def get_min_max_run() -> tuple[float, int, float, int]:
-    if len(runs) == 0:
-        return (0.0, -1, 0.0, -1)
-    l_run, h_run, l_idx, h_idx = runs[0], runs[0], 0, 0
-    for i in range(1, len(runs)):
-        if h_run < runs[i]:
-            h_run = runs[i]
-            h_idx = i
-        if l_run > runs[i]:
-            l_run = runs[i]
-            l_idx = i
-
-    return (h_run, h_idx, l_run, l_idx)
-
-
-def timer(
-    should_stop: Callable[[], bool],
-    start_time: Callable[[], float],
-    avg_run_time: Callable[[], float],
-    run_till_start_of_wave: Callable[[], int],
-    logs: Callable[[], list[str]],
-):
-    while not should_stop():
-        now = time.perf_counter()
-        log = [
-            *catalog(now, start_time(), avg_run_time(), run_till_start_of_wave()),
-            "",
-            "To stop farming for gems, press BACKSPACE on your keyboard",
-            "",
-            *logs(),
-        ]
-        print("\n".join(log))
-        time.sleep(UPDATE_RATE)
-        os.system("cls")
-
-
-def catalog(
-    now: float, start_time: float, avg_run_time: float, run_till_start_of_wave: int
-):
-    highest_run_time, h_idx, lowest_run_time, l_idx = get_min_max_run()
-    return (
-        "\t\t[RUNS INFO]",
-        f"\tTotal # of runs completed: {len(runs)}",
-        f"\tTime elapsed: {utils.to_human_time(now - start_time)}",
-        f"\tAverage run time: {utils.to_human_time(avg_run_time//len(runs)) if len(runs) > 0 else 'N/A'}",
-        f"\tSlowest run time: {f'{utils.to_human_time(highest_run_time)} (Achieved at run #{h_idx + 1})' if highest_run_time != 0 else 'N/A'}",
-        f"\tFastest run time: {f'{utils.to_human_time(lowest_run_time)} (Achieved at run #{l_idx + 1})' if lowest_run_time != 0 else 'N/A'}",
-        "",
-        "\t\t[GAME STATS]",
-        f"\tWaves per run: {run_till_start_of_wave - 1}",
-        f"\tGames lost: {losses}",
-        f"\tGames won: {len(runs) - losses}",
-        f"\tWin rate: {f'{((len(runs)-losses)/len(runs))*100}%' if len(runs) > 0 else 'N/A'}",
-        f"\t# of disconnections: {disconnections}",
-    )
-
-
-def main():
-    global runs
-    global losses
-    global disconnections
-    runs.clear()
+def main(macro_id: str):
+    print("Executing macro in 3...", end="\r")
+    time.sleep(1)
+    print("Executing macro in 2...", end="\r")
+    time.sleep(1)
+    print("Executing macro in 1...", end="\r")
+    time.sleep(1)
+    should_stop = False
+    is_disconnected = False
+    time_runs = []  # A list of time of each run
+    logs = []  # Output during ingame macro execution
+    browser_window: int | None = None
     losses = 0
+    wins = 0
     disconnections = 0
-    # Tracking variables
-    start_time = time.perf_counter()
 
-    # Controller
-    kb_controller = pynput.keyboard.Controller()
-
-    run_till_start_of_wave = 10
     config = utils.read_config()
-    run_till_start_of_wave = config["waves_per_run"] + 1
-    avg_run_time: int = 0
-    should_stop_timer = False
-    should_detect_loss = True
-    game_loss = False
-    logs: list[str] = []
+    macro = macro_edit.get_macro(macro_id)
 
-    def loss_detector():
-        nonlocal game_loss
-        nonlocal should_detect_loss
-        while should_detect_loss and not game_loss:
-            color1 = pyautogui.pixel(
-                config[f"{utils.DEFEAT_LABEL}_pos"][0],
-                config[f"{utils.DEFEAT_LABEL}_pos"][1],
-            )
-            color2 = pyautogui.pixel(
-                config[f"{utils.HP_BAR_ZERO}_pos"][0],
-                config[f"{utils.HP_BAR_ZERO}_pos"][1],
-            )
+    def cancel_listener(key: pynput.keyboard.Key):
+        nonlocal should_stop
+        if key == pynput.keyboard.Key.backspace:
+            should_stop = True
+
+    def disconnection_listener(
+        should_stop_get: Callable[[], bool], get_is_disconnected: Callable[[], bool]
+    ):
+        nonlocal is_disconnected
+        while not should_stop_get():
+            hwnd = win32gui.FindWindow(None, "Roblox")
+            pos, color = utils.get_config_prop(utils.DISCONNECTED_DIALOG_BOX)
+            x, y = pos
             if (
-                color1 == config[f"{utils.DEFEAT_LABEL}_color"]
-                and color2 == config[f"{utils.HP_BAR_ZERO}_color"]
+                pyautogui.pixelMatchesColor(x, y, color)
+                and hwnd == win32gui.GetForegroundWindow()
             ):
-                game_loss = True
-                should_detect_loss = False
+                time.sleep(5)
+                if (
+                    pyautogui.pixelMatchesColor(x, y, color)
+                    and hwnd == win32gui.GetForegroundWindow()
+                ):
+                    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                    is_disconnected = True
+                    while get_is_disconnected():
+                        pass
 
-    t1 = threading.Thread(
-        target=timer,
-        args=(
-            lambda: should_stop_timer,
-            lambda: start_time,
-            lambda: avg_run_time,
-            lambda: run_till_start_of_wave,
-            lambda: logs,
-        ),
+    def info_listener(should_stop_get: Callable[[], bool]):
+        nonlocal time_runs
+        nonlocal wins
+        nonlocal losses
+        nonlocal disconnections
+
+        s = time.perf_counter()
+
+        info = "\n\t".join(
+            [
+                f"\tTime elapsed: {to_date(time.perf_counter() - s)}",
+                f"# of runs completed: {len(time_runs)}",
+                f"Current run #: {len(time_runs) + 1}",
+            ]
+        )
+        while not should_stop_get():
+            info = "\n\t".join(
+                [
+                    "",
+                    "\t[INFO]",
+                    f"Time elapsed: {to_date(time.perf_counter() - s)}",
+                    f"# of waves per run: {macro['waves']}",
+                    f"  - # of wins: {wins}",
+                    f"  - # of losses: {losses}",
+                    f"  - win rate: {(f'{round((wins/len(time_runs)) * 10000)/100}%') if len(time_runs) != 0 else 'N/A'}",
+                    f"Current run #: {len(time_runs) + 1}",
+                    f"# of runs completed: {len(time_runs)}",
+                    f"  - Fastest run time: {to_date(min(time_runs)) if len(time_runs) != 0 else 'N/A'}",
+                    f"  - Slowest run time: {to_date(max(time_runs)) if len(time_runs) != 0 else 'N/A'}",
+                    f"  - Average run time: {to_date(sum(time_runs)/len(time_runs)) if len(time_runs) != 0 else 'N/A'}",
+                    f"# of disconnections: {disconnections}",
+                    "",
+                    "[LOGS]",
+                    "",
+                    *logs,
+                ]
+            )
+            os.system("cls")
+            print(info)
+            time.sleep(menu.Menu.TICK_RATE)
+        os.system("cls")
+        print(info)
+
+    listener = pynput.keyboard.Listener(on_press=cancel_listener)
+    keyboard_controller = pynput.keyboard.Controller()
+    d_listener = threading.Thread(
+        target=disconnection_listener,
+        args=(lambda: should_stop, lambda: is_disconnected),
     )
+    i_listener = threading.Thread(target=info_listener, args=(lambda: should_stop,))
+    listener.start()
+    d_listener.start()
+    i_listener.start()
 
-    t1.start()
+    def execute_macros(
+        is_disconnected: Callable[[], bool],
+        should_stop: Callable[[], bool],
+        start: int | None = None,
+        end: int | None = None,
+    ):
+        nonlocal browser_window
+        seq_macros: list[dict[str]] = macro_edit.get_macro(macro_id)["lobby_sequence"]
+        seq_macros = seq_macros[
+            start - 1 if start != None else 0 : end if end != None else len(seq_macros)
+        ]
+        for i, macro_seq in enumerate(seq_macros):
+            if is_disconnected() or should_stop():
+                return
+            match macro_seq["type"]:
+                case Macro_Type.TINY_TASK:
+                    logs.append(f"Executing tiny task {i + 1}.exe")
+                    os.system(f'"%CD%/macros/{macro_id}/{i + 1}.exe"')
+                case Macro_Type.CLICK:
+                    x, y = macro_seq["position"]
+                    logs.append(f"Clicked ({x}, {y})")
+                    try:
+                        pydirectinput.click(x, y)  # NOT CLICKING WHEN NO FOUCSED WINDOW
+                    except Exception as e:
+                        print(e)
+                        should_stop = True
+                        os._exit(1)
+                    if macro_seq["should_fullscreen_roblox"]:
+                        if browser_window == None:
+                            browser_window = win32gui.GetForegroundWindow()
+                        logs.append("Waiting for Roblox application...")
+                        elapsed = time.perf_counter()
+                        while not is_disconnected() and not should_stop():
+                            hwnd = win32gui.FindWindow(None, "Roblox")
+                            if time.perf_counter() - elapsed >= 10:
+                                logs.append(
+                                    "Failed to detect Roblox within 10 seconds. Attempting to relaunch..."
+                                )
+                                elapsed = time.perf_counter()
+                                try:
+                                    pydirectinput.click(x, y)
+                                except Exception as e:
+                                    print(e)
+                                    should_stop = True
+                                    os._exit(1)
+                            if hwnd != 0:
+                                logs.append(
+                                    "Maximized Roblox application. Continuing..."
+                                )
+                                win32gui.ShowWindow(
+                                    win32gui.FindWindow(None, "Roblox"),
+                                    win32con.SW_RESTORE,
+                                )
+                                win32gui.SetWindowPos(
+                                    hwnd,
+                                    win32con.HWND_NOTOPMOST,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
+                                )
+                                win32gui.SetWindowPos(
+                                    hwnd,
+                                    win32con.HWND_TOPMOST,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
+                                )
+                                win32gui.SetWindowPos(
+                                    hwnd,
+                                    win32con.HWND_NOTOPMOST,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    win32con.SWP_SHOWWINDOW
+                                    + win32con.SWP_NOMOVE
+                                    + win32con.SWP_NOSIZE,
+                                )
+                                break
+                case Macro_Type.WAIT:
+                    time.sleep(macro_seq["ms"] / 1000)
+                case Macro_Type.WAIT_CONDITIONALLY:
+                    x, y = macro_seq["position"]
+                    color = macro_seq["color"]
+                    logs.append(f"Waiting for condition...")
+                    while (
+                        not pyautogui.pixelMatchesColor(x, y, color)
+                        and not should_stop()
+                        and not is_disconnected()
+                    ):
+                        pass
+                    logs.append(f"Condition fulfilled. Continuing...")
+                case Macro_Type.KEY_DOWN:
+                    keyboard_controller.press(eval(macro_seq["key"]))
+                case Macro_Type.KEY_UP:
+                    keyboard_controller.release(eval(macro_seq["key"]))
+                case Macro_Type.KEY_PRESS:
+                    keyboard_controller.tap(eval(macro_seq["key"]))
+                case Macro_Type.REPEAT_LINES:
+                    if macro_seq["repeat_type"] == "timer":
+                        s = time.perf_counter()
+                        seconds = macro_seq["ms"] / 1000
+                        start, end = macro_seq["lines"]
+                        logs.append(
+                            f"Repeating #{start} to #{end} for {seconds} seconds."
+                        )
+                        while time.perf_counter() - s <= seconds:
+                            execute_macros(is_disconnected, should_stop, start, end)
+                        logs.append(f"Finished repeating task. Continuing...")
+                case Macro_Type.GLOBAL_TINY_TASK:
+                    logs.append(f"Executing bin tinytask {macro_seq['file_name']}")
+                    os.system(f'"%CD%/bin/{macro_seq["file_name"]}"')
+                case Macro_Type.LISTENER:
+                    try:
+                        val = EVENT_LISTENERS_MAPPED[macro_seq["name"]]
+                        logs.append(
+                            f"Waiting for response from {macro_seq['name']} whose key value is {val}..."
+                        )
+                        pos, color = utils.get_config_prop(val)
 
-    def execute_run(skip_joining_private_server: bool):
-        global runs
-        nonlocal avg_run_time
+                        x, y = pos
+                        while (
+                            not pyautogui.pixelMatchesColor(x, y, color)
+                            and not should_stop()
+                            and not is_disconnected()
+                        ):
+                            pass
+                        logs.append("\t- Response received!")
+                    except Exception:
+                        should_stop = True
+                        time.sleep(5)
+                        print(traceback.format_exc())
+                        print(EVENT_LISTENERS_MAPPED)
+                        print(macro_seq["name"])
+                        os._exit(1)
+
+    def ingame_macros(
+        is_disconnected: Callable[[], bool],
+        should_stop: Callable[[], bool],
+        starting_run_time: float,
+    ):
         nonlocal logs
-        nonlocal game_loss
-        nonlocal should_detect_loss
-        should_detect_loss = True
-        game_loss = False
-        config = utils.read_config()
+        nonlocal time_runs
+        nonlocal wins
+        nonlocal losses
 
-        while True:
-            now = time.perf_counter()
-            logs.clear()
-            # print("\tLaunching roblox...")
-            # Auto-start anime adventures private server
-            if not skip_joining_private_server:
-                run_macro("%CD%/bin/joinprivateserver.exe", autofocus=False)
+        has_lost = False
+        if is_disconnected() or should_stop():
+            return
 
-            is_opened = False
-            while not is_opened:
-                detect_stop()
-                top_windows = []
-                win32gui.EnumWindows(windowEnumerationHandler, top_windows)
-                for process in top_windows:
-                    HWND = process[0]
-                    if process[1] == "Roblox":
-                        is_opened = True
-                        logs.append("\tDetected Roblox application")
-                        win32gui.ShowWindow(HWND, win32con.SW_RESTORE)
-                        win32gui.SetWindowPos(
-                            HWND,
-                            win32con.HWND_NOTOPMOST,
-                            0,
-                            0,
-                            0,
-                            0,
-                            win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
-                        )
-                        win32gui.SetWindowPos(
-                            HWND,
-                            win32con.HWND_TOPMOST,
-                            0,
-                            0,
-                            0,
-                            0,
-                            win32con.SWP_NOMOVE + win32con.SWP_NOSIZE,
-                        )
-                        win32gui.SetWindowPos(
-                            HWND,
-                            win32con.HWND_NOTOPMOST,
-                            0,
-                            0,
-                            0,
-                            0,
-                            win32con.SWP_SHOWWINDOW
-                            + win32con.SWP_NOMOVE
-                            + win32con.SWP_NOSIZE,
-                        )
-                        break
-            while True:
-                detect_stop()
-                color = pyautogui.pixel(
-                    config[f"{utils.LOBBY_PLAY_BTN_PROP}_pos"][0],
-                    config[f"{utils.LOBBY_PLAY_BTN_PROP}_pos"][1],
-                )
-                if color == config[f"{utils.LOBBY_PLAY_BTN_PROP}_color"]:
-                    logs.append("\tSuccessfully loaded in-game")
-                    run_macro("%CD%/bin/lobbyclickplay.exe")
-                    # pyautogui.moveTo(x=153, y=479, duration=DELAY)
-                    # pyautogui.click(clicks=2, interval=DELAY)
-                    break
+        def detect_loss(
+            should_stop: Callable[[], bool], is_disconnected: Callable[[], bool]
+        ):
+            nonlocal has_lost
+            while not should_stop() and not is_disconnected():
+                pos1, color1 = utils.get_config_prop(utils.DEFEAT_LABEL)
+                pos2, color2 = utils.get_config_prop(utils.HP_BAR_ZERO)
 
-            start = time.perf_counter()
-            kb_controller.press("d")
-            kb_controller.press("w")
-            kb_controller.press(pynput.keyboard.Key.shift_l)
-            while True:
-                listeners()
-                if time.perf_counter() - start > 1.75:
-                    kb_controller.release("d")
-                    kb_controller.release(pynput.keyboard.Key.shift_l)
-                    break
+                x1, y1 = pos1
+                x2, y2 = pos2
+                if pyautogui.pixelMatchesColor(
+                    x1, y1, color1
+                ) and pyautogui.pixelMatchesColor(x2, y2, color2):
+                    has_lost = True
 
-            start = time.perf_counter()
-            while True:
-                kb_controller.release("d")
-                kb_controller.press("a")
-                time.sleep(0.01)
-                kb_controller.release("a")
-                kb_controller.press("d")
-                time.sleep(0.01)
-                if time.perf_counter() - start > 0.5:
-                    kb_controller.release("w")
-                    kb_controller.release("a")
-                    kb_controller.release("d")
-                    break
+        loss_detector = threading.Thread(
+            target=detect_loss,
+            args=(
+                should_stop,
+                is_disconnected,
+            ),
+        )
+        loss_detector.start()
+        dirs = [
+            path
+            for path in os.listdir(f"{os.getcwd()}\\macros\\{macro_id}")
+            if os.path.isdir(f"{os.getcwd()}\\macros\\{macro_id}\\{path}")
+        ]
+        while not is_disconnected() and not should_stop():
+            found_cam_angle_name = None
+            has_lost = False
 
-            while True:
-                listeners()
-                color = pyautogui.pixel(
-                    config[f"{utils.CANCEL_MAP_BTN}_pos"][0],
-                    config[f"{utils.CANCEL_MAP_BTN}_pos"][1],
-                )
-                if color == config[f"{utils.CANCEL_MAP_BTN}_color"]:
-                    run_macro("%CD%/bin/selectmarineford.exe")
-                    break
-
-            while True:
-                listeners()
-                color = pyautogui.pixel(
-                    config[f"{utils.START_MAP_BTN}_pos"][0],
-                    config[f"{utils.START_MAP_BTN}_pos"][1],
-                )
-                if color == config[f"{utils.START_MAP_BTN}_color"]:
-                    run_macro("%CD%/bin/startmarineford.exe")
-                    break
-
-            is_normal_camera_angle = False
-            macro_parent_folder = ""
-
-            while True:
-                listeners()
-                color = pyautogui.pixel(
-                    config[f"{utils.START_WAVE_BTN}_pos"][0],
-                    config[f"{utils.START_WAVE_BTN}_pos"][1],
-                )
-                if color == config[f"{utils.START_WAVE_BTN}_color"]:
-                    color2 = pyautogui.pixel(
-                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_pos"][0],
-                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_pos"][1],
-                    )
-                    is_normal_camera_angle = utils.is_approximate_color(
-                        config[f"{utils.NORMAL_CAMERA_ANGLE_INDICATOR}_color"],
-                        color2,
-                        20,
-                    )
-                    if is_normal_camera_angle:
-                        logs.append("\tUsing NORMAL camera angle macros!")
-                        macro_parent_folder = "normal"
-                    else:
-                        logs.append("\tUsing BIRD-EYE camera angle macros!")
-                        macro_parent_folder = "birdeye"
-                    run_macro("%CD%/bin/clickwavestart.exe")
-                    break
-
-            # Listen for wave completions
-            wave = 1
-            files = os.listdir(f"./wave_events/{macro_parent_folder}")
-            t2 = threading.Thread(target=loss_detector)
-            t2.start()
-
-            while not game_loss:
-                listeners()
-                color = pyautogui.pixel(
-                    config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][0],
-                    config[f"{utils.WAVE_COMPLETED_LABEL}_pos"][1],
-                )
-                if color == config[f"{utils.WAVE_COMPLETED_LABEL}_color"]:
-                    logs.append(f"\tWave {wave} completed")
-                    if "every_wave_completed.exe" in files:
-                        run_macro(
-                            f"%CD%/wave_events/{macro_parent_folder}/every_wave_completed.exe"
-                        )
-                    wave += 1
-
-                    if wave == run_till_start_of_wave:
-                        end_time = time.perf_counter() - now
-                        runs.append(end_time)
-                        avg_run_time += end_time
-                        run_macro("%CD%/bin/closegame.exe", autofocus=False)
-                        skip_joining_private_server = False
+            s = time.perf_counter()
+            e = s
+            while (
+                not should_stop()
+                and found_cam_angle_name == None
+                and e - s <= 30
+                and len(dirs) > 0
+                and not is_disconnected()
+            ):
+                e = time.perf_counter()
+                for cam_angle in dirs:
+                    val = cam_editor.compare_to(macro_id, cam_angle)
+                    if val >= cam_editor.SIMILARITY:
+                        found_cam_angle_name = cam_angle
+                        logs.append(f"Detected {found_cam_angle_name}")
                         break
 
-                    if str(wave) in files:
-                        wave_actions = os.listdir(
-                            f"wave_events/{macro_parent_folder}/{wave}"
-                        )
-                        for action in wave_actions:
-                            run_macro(
-                                f"%CD%/wave_events/{macro_parent_folder}/{wave}/{action}"
+            current_wave = 1
+            while not should_stop() and not is_disconnected():
+                x, y = config[f"{utils.START_WAVE_BTN}_pos"]
+                color = config[f"{utils.START_WAVE_BTN}_color"]
+
+                if pyautogui.pixelMatchesColor(x, y, color):
+                    os.system('"%CD%/bin/clickwavestart.exe"')
+                    break
+
+            if len(dirs) == 0:
+                logs.append("No camera angles found for this macro")
+
+            if e - s >= 30:
+                logs.append("Failed to detect camera angles")
+
+            while not should_stop() and not is_disconnected() and not has_lost:
+                x, y = config[f"{utils.WAVE_COMPLETED_LABEL}_pos"]
+                color = config[f"{utils.WAVE_COMPLETED_LABEL}_color"]
+                if pyautogui.pixelMatchesColor(x, y, color):
+                    current_wave += 1
+                    if current_wave > macro["waves"]:
+                        pyautogui.press("alt")
+                        win32gui.SetForegroundWindow(browser_window)
+                        close_roblox()
+                        wins += 1
+                        time_runs.append(time.perf_counter() - starting_run_time)
+                        return
+                    path = f"{os.getcwd()}\\macros\\{macro_id}\\{found_cam_angle_name}\\{current_wave}"
+                    if os.path.exists(path):
+                        macros_in_wave = os.listdir(path)
+                        for executable in macros_in_wave:
+                            os.system(
+                                f'"%CD%/macros/{macro_id}/{found_cam_angle_name}/{current_wave}/{executable}"'
                             )
                     else:
-                        logs.append(
-                            f"\t- No action found for wave {wave}. Waiting till the end of wave {wave}..."
-                        )
+                        logs.append(f"No macros found for wave {current_wave}")
+                    time.sleep(5)
 
-                    s = time.perf_counter()
-                    while time.perf_counter() - s <= 5:
-                        detect_stop()
-            detect_loss()
+            if has_lost:
+                logs.append("Loss detected. Retrying...")
+                losses += 1
+                now = time.perf_counter()
+                time_runs.append(now - starting_run_time)
+                os.system('"%CD%/bin/retryfromloss.exe"')
+                time.sleep(3)
+            else:
+                break
 
-    def detect_stop():
-        nonlocal should_stop_timer
-        if keyboard.is_pressed("backspace"):
-            should_stop_timer = True
-            time.sleep(UPDATE_RATE)
-            now = time.perf_counter()
-            os.system("cls")
-            results = [
-                *catalog(now, start_time, avg_run_time, run_till_start_of_wave),
-                "",
-                "Press ESCAPE to exit",
-                "Press SHIFT to restart the program",
-            ]
-            print("\n".join(results))
-            while True:
-                if is_focused():
-                    if keyboard.is_pressed("escape"):
-                        os._exit(0)
-                    if keyboard.is_pressed("shift"):
-                        main()
+    while not should_stop:
+        starting_run_time = time.perf_counter()
+        logs.append("Executing pre-game macro sequence...")
+        execute_macros(lambda: is_disconnected, lambda: should_stop)
+        logs.append("")
+        ingame_macros(lambda: is_disconnected, lambda: should_stop, starting_run_time)
+        logs.clear()
+        if is_disconnected:
+            logs.append("Detected disconnection. Attempting to reconnect...")
+            close_roblox()
+            pyautogui.press("alt")
+            win32gui.SetForegroundWindow(browser_window)
+            while not utils.has_internet():
+                logs.append("There is no internet connection! Waiting...")
+            is_disconnected = False
 
-    def detect_disconnection():
-        global disconnections
-        nonlocal logs
-        color = pyautogui.pixel(
-            config[f"{utils.DISCONNECTED_DIALOG_BOX}_pos"][0],
-            config[f"{utils.DISCONNECTED_DIALOG_BOX}_pos"][1],
-        )
-        roblox = win32gui.FindWindow(None, "Roblox")
-        if roblox:
-            tup = win32gui.GetWindowPlacement(roblox)
-            if (
-                color == config[f"{utils.DISCONNECTED_DIALOG_BOX}_color"]
-                and tup[1] == win32con.SW_SHOWMAXIMIZED
-            ):
-                disconnections += 1
-                logs.append(
-                    "\tDetected user has been disconnected. Attempting to reconnect..."
-                )
-                os.system("%CD%/bin/closegame.exe")
-                while True:
-                    if keyboard.is_pressed("backspace"):
-                        raise Exception()
-                    os.system("%CD%/bin/joinprivateserver.exe")
-                    start = time.perf_counter()
-                    while time.perf_counter() - start <= 1:
-                        if keyboard.is_pressed("backspace"):
-                            raise Exception()
-                    if pyautogui.pixel(x=953, y=482) == (255, 255, 255):
-                        break
-                    start = time.perf_counter()
-                    while time.perf_counter() - start <= 0.1:
-                        if keyboard.is_pressed("backspace"):
-                            raise Exception()
+    listener.stop()
+    should_exit = False
 
-                    pyautogui.click(x=943, y=602)  # OK button
-                execute_run(True)
+    def on_escape(key: pynput.keyboard.Key):
+        nonlocal should_exit
+        if (
+            key == pynput.keyboard.Key.esc
+            and win32gui.GetForegroundWindow() == menu.HWND
+        ):
+            should_exit = True
 
-    def detect_loss():
-        global runs
-        global losses
-        nonlocal avg_run_time
-        nonlocal logs
-        nonlocal game_loss
-        if game_loss:
-            end_time = time.perf_counter()
-            logs.append("\tLoss detected. Redoing run...")
-            runs.append(end_time)
-            avg_run_time += end_time
-            losses += 1
-            os.system('"%CD%/bin/closegame.exe"')
-            execute_run(False)
+    exit_listener = pynput.keyboard.Listener(on_press=on_escape)
+    exit_listener.start()
+    print("\nPress ESCAPE to return to macro profile selector")
+    time.sleep(0.1)
+    while not should_exit:
+        pass
+    exit_listener.stop()
 
-    def listeners():
-        detect_stop()
-        detect_disconnection()
-        detect_loss()
 
-    execute_run(False)
+def list_macros() -> list[menu.MenuItem]:
+    macros = utils.read_macros()
+    return [
+        menu.MenuItem(x["name"], (lambda y: lambda: main(y["id"]))(x)) for x in macros
+    ]
 
 
 if __name__ == "__main__":
-    main()
+    m = menu.Menu("Roblox Macro Executor")
+    m.header("Select a macro profile to execute")
+    m.item(list_macros)
+    m.show()

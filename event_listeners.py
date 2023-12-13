@@ -40,7 +40,18 @@ EVENT_LISTENERS = [
     "Wave Start Button Listener",
     "Map Menu Listener",
     "Start Map Listener",
+    "Play Button Listener",
 ]
+
+EVENT_LISTENERS_MAPPED = {
+    EVENT_LISTENERS[0]: utils.DISCONNECTED_DIALOG_BOX,
+    EVENT_LISTENERS[1]: utils.DEFEAT_LABEL,
+    EVENT_LISTENERS[2]: utils.WAVE_COMPLETED_LABEL,
+    EVENT_LISTENERS[3]: utils.START_WAVE_BTN,
+    EVENT_LISTENERS[4]: utils.CANCEL_MAP_BTN,
+    EVENT_LISTENERS[5]: utils.START_MAP_BTN,
+    EVENT_LISTENERS[6]: utils.LOBBY_PLAY_BTN_PROP,
+}
 
 EVENT_LISTENER_CALLBACK = {
     EVENT_LISTENERS[0]: lambda: create_listener(
@@ -70,6 +81,11 @@ EVENT_LISTENER_CALLBACK = {
         EVENT_LISTENERS[5],
         utils.START_MAP_BTN,
         "This event listener when the user can start the map that has been selected.\nThis must be set so that the program can automatically start the chosen map.",
+    ),
+    EVENT_LISTENERS[6]: lambda: create_listener(
+        EVENT_LISTENERS[6],
+        utils.LOBBY_PLAY_BTN_PROP,
+        "This event listener detects when the play button is present on screen so that\nthe user can teleport into the play area to enter a pod.",
     ),
 }
 

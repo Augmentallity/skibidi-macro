@@ -68,14 +68,7 @@ if __name__ == "__main__":
     while not keyboard.is_pressed("escape"):
         if keyboard.is_pressed("shift"):
             os.system("cls")
-            handle = win32gui.LoadCursor(
-                win32gui.GetForegroundWindow(),
-                win32con.IDC_HAND,
-            )
-            print(
-                win32gui.GetCursorInfo()[1],
-                handle,
-                win32gui.GetModuleHandle("Roblox.exe"),
-            )
+            # hwnd = win32gui.FindWindow(None, "microsoft")
+            print(win32gui.GetForegroundWindow())
             # x, y = pyautogui.position()
             # print(f"({x}, {y})")

@@ -1,4 +1,5 @@
 import json
+import requests
 
 LOBBY_PLAY_BTN_PROP = "lobby_play_btn"
 CANCEL_MAP_BTN = "cancel_map_btn"
@@ -8,11 +9,8 @@ WAVE_COMPLETED_LABEL = "wave_cmplt_label"
 DISCONNECTED_DIALOG_BOX = "disconnected_dialog_box"
 DEFEAT_LABEL = "defeat_label"
 HP_BAR_ZERO = "hp_zero_bar"
-NORMAL_CAMERA_ANGLE_INDICATOR = "normal_camera_detector"
 
 DEFAULT_CONFIG = {
-    "waves_per_run": 10,
-    "active_macro": "",
     f"{LOBBY_PLAY_BTN_PROP}_pos": (160, 497),
     f"{LOBBY_PLAY_BTN_PROP}_color": (32, 242, 235),
     f"{CANCEL_MAP_BTN}_pos": (961, 878),
@@ -29,8 +27,6 @@ DEFAULT_CONFIG = {
     f"{DEFEAT_LABEL}_color": (222, 0, 0),
     f"{HP_BAR_ZERO}_pos": (603, 67),
     f"{HP_BAR_ZERO}_color": (25, 22, 22),
-    f"{NORMAL_CAMERA_ANGLE_INDICATOR}_pos": (1370, 144),
-    f"{NORMAL_CAMERA_ANGLE_INDICATOR}_color": (16, 71, 132),
 }
 
 config: dict[str] = None
@@ -132,3 +128,14 @@ def to_human_time(d: int | float):
     minutes = round((d / 60) % 60)
     hours = round((d / 3600) % 60)
     return f"{hours}h {minutes}m {seconds}s"
+
+
+def has_internet() -> bool:
+    try:
+        requests.get(
+            url="https://www.google.com/",
+            timeout=read_config()["reconnection_attempt_interval"],
+        )
+        return True
+    except:
+        return False

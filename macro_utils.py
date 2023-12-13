@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from macro import Macro_Type
 import os
 import menu
@@ -46,21 +47,35 @@ def get_seq_macro(
 
 
 def on_macro_change(macro_id: str, macro_type: str):
+    def first_rename(seq_macro_tiny_task: dict[str]):
+        old_idx = seq_macro_tiny_task["idx"]
+        os.rename(
+            f"{os.getcwd()}\\macros\\{macro_id}\\{old_idx + 1}.exe",
+            f"{os.getcwd()}\\macros\\{macro_id}\\tmp_{old_idx + 1}.exe",
+        )
+
+    def second_rename(seq_macro_tiny_task: dict[str], i: int):
+        old_idx = seq_macro_tiny_task["idx"]
+        os.rename(
+            f"{os.getcwd()}\\macros\\{macro_id}\\tmp_{old_idx + 1}.exe",
+            f"{os.getcwd()}\\macros\\{macro_id}\\{i + 1}.exe",
+        )
+
     macro = get_macro(macro_id)
-    for i, seq_macro in enumerate(macro[macro_type]):
-        if seq_macro["type"] == Macro_Type.TINY_TASK:
-            old_idx: int = seq_macro["idx"]
-            if old_idx != i:
-                os.rename(
-                    f"{os.getcwd()}\\macros\\{macro_id}\\{old_idx + 1}.exe",
-                    f"{os.getcwd()}\\macros\\{macro_id}\\tmp_{old_idx + 1}.exe",
-                )
-    for i, seq_macro in enumerate(macro[macro_type]):
-        if seq_macro["type"] == Macro_Type.TINY_TASK:
-            old_idx: int = seq_macro["idx"]
-            if old_idx != i:
-                os.rename(
-                    f"{os.getcwd()}\\macros\\{macro_id}\\tmp_{old_idx + 1}.exe",
-                    f"{os.getcwd()}\\macros\\{macro_id}\\{i + 1}.exe",
-                )
-                seq_macro["idx"] = i
+    rename_schedule = [
+        (seq_macro, i)
+        for i, seq_macro in enumerate(macro[macro_type])
+        if seq_macro["type"] == Macro_Type.TINY_TASK and seq_macro["idx"] != i
+    ]
+
+    if len(rename_schedule) == 0:
+        return
+
+    with ThreadPoolExecutor(len(rename_schedule)) as t:
+        _ = [t.submit(first_rename, tp[0]) for tp in rename_schedule]
+
+    with ThreadPoolExecutor(len(rename_schedule)) as t:
+        _ = [t.submit(second_rename, seq_macro, i) for seq_macro, i in rename_schedule]
+
+    for seq_macro, i in rename_schedule:
+        seq_macro["idx"] = i

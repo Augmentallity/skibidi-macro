@@ -1,6 +1,7 @@
 import threading
 from typing import Callable
 import uuid
+from event_listeners import EVENT_LISTENERS
 from macro import MAPPED_TYPES, Macro_Type, get_seq_macro_str
 from macro_utils import delete_seq_macro, get_seq_macro, get_macro
 import menu
@@ -35,6 +36,11 @@ def click(
     seq_macro = get_seq_macro(macro_id, macro_type, _id)
     n = menu.Menu("Click Macro")
     pos: tuple[int, int] | None = seq_macro["position"] if seq_macro != None else None
+    should_fullscreen_roblox: bool = (
+        seq_macro["should_fullscreen_roblox"]
+        if (seq_macro != None and "should_fullscreen_roblox" in seq_macro)
+        else False
+    )
 
     def on_press(key: pynput.keyboard.Key):
         nonlocal pos
@@ -44,11 +50,16 @@ def click(
     listener = pynput.keyboard.Listener(on_press=on_press)
     listener.start()
 
+    def toggle():
+        nonlocal should_fullscreen_roblox
+        should_fullscreen_roblox = not should_fullscreen_roblox
+
     def save_changes():
         nonlocal pos
         nonlocal _id
         if seq_macro != None:
             seq_macro["position"] = (pos[0], pos[1])
+            seq_macro["should_fullscreen_roblox"] = should_fullscreen_roblox
             menu.stack.pop()
             utils.write_macros()
             return
@@ -63,6 +74,7 @@ def click(
                 "id": _id,
                 "type": Macro_Type.CLICK,
                 "position": (pos[0], pos[1]),
+                "should_fullscreen_roblox": should_fullscreen_roblox,
             }
         )
         exit_editor()
@@ -75,6 +87,12 @@ def click(
             if pos != None
             else f"Confirm : N/A",
             save_changes,
+        )
+    )
+    n.item(
+        menu.MenuItem(
+            lambda: f"[{'✓' if should_fullscreen_roblox else ' '}] This click joins a private server",
+            toggle,
         )
     )
 
@@ -433,6 +451,63 @@ def generate_key_macro(macro_type_enum: int):
     return key_press
 
 
+def bin_macro(
+    macro_id: str,
+    macro_type: str,
+    macro_seq_id: Callable[[], str] = lambda: str(uuid.uuid4()),
+):
+    m = menu.Menu("Tiny Task (/bin) Macro")
+    _id = macro_seq_id()
+    macro_seq = get_seq_macro(macro_id, macro_type, _id)
+    file_name: str | None = macro_seq["file_name"] if macro_seq != None else None
+
+    def save_changes():
+        if macro_seq != None:
+            macro_seq["file_name"] = file_name
+            menu.stack.pop()
+        else:
+            macro = get_macro(macro_id)
+            macro[macro_type].append(
+                {"id": _id, "type": Macro_Type.GLOBAL_TINY_TASK, "file_name": file_name}
+            )
+            exit_editor()
+        utils.write_macros()
+
+    def change_file_name(s: str):
+        nonlocal file_name
+        file_name = s
+
+    def list_bin_macros():
+        return [
+            menu.MenuItem(
+                f"{x[:-4]}" + (" (SELECTED)" if file_name == x else ""),
+                (lambda s: lambda: change_file_name(s))(x),
+            )
+            for x in os.listdir(f"{os.getcwd()}\\bin")
+            if x.endswith(".exe")
+        ]
+
+    m.header(
+        'This uses a tinytask macro found in the bin folder. This is a\nglobal macro, meaning it can be accessed globally. Global macros\nare useful when a macro is often reused. Such example would\nbe "clickplay" that clicks the "Play" button.'
+    )
+    m.item(list_bin_macros)
+    m.text("")
+    m.text(lambda: f"Current: {file_name[:-4] if file_name != None else 'None'}\n")
+    m.item(menu.MenuItem("Save changes", save_changes))
+    m.item(
+        lambda: [
+            menu.MenuItem(
+                "Execute tiny task macro",
+                lambda: os.system(f"{os.getcwd()}\\bin\\{file_name}"),
+            )
+        ]
+        if file_name != None
+        else []
+    )
+    m.item(menu.MenuItem("Back", lambda: menu.stack.pop()))
+    m.show()
+
+
 def tiny_task_macro(
     macro_id: str,
     macro_type: str,
@@ -508,6 +583,49 @@ def tiny_task_macro(
                 delete,
             )
         )
+    m.item(menu.MenuItem("Back", lambda: menu.stack.pop()))
+    m.show()
+
+
+def event_listener(
+    macro_id: str,
+    macro_type: str,
+    macro_seq_id: Callable[[], str] = lambda: str(uuid.uuid4()),
+):
+    m = menu.Menu("Listener")
+    _id = macro_seq_id()
+    seq_macro = get_seq_macro(macro_id, macro_type, _id)
+    selected_listener: str | None = seq_macro["name"] if seq_macro != None else None
+
+    def set_selected_listener(y: str):
+        nonlocal selected_listener
+        selected_listener = y
+
+    def save_changes():
+        if selected_listener == None:
+            return
+
+        if seq_macro != None:
+            seq_macro["name"] = selected_listener
+            menu.stack.pop()
+        else:
+            seq_macros = get_macro(macro_id)[macro_type]
+            seq_macros.append(
+                {"type": Macro_Type.LISTENER, "id": _id, "name": selected_listener}
+            )
+            exit_editor()
+        utils.write_macros()
+
+    listeners = [
+        menu.MenuItem(x, (lambda y: lambda: set_selected_listener(y))(x))
+        for x in EVENT_LISTENERS
+    ]
+    m.header(
+        'Event Listeners are basically "Wait (condition)" but can be accessed globally,\nmeaning that their functionality is shared across all macros.'
+    )
+    m.item(lambda: listeners)
+    m.text(lambda: f"\nCurrent: {selected_listener}\n")
+    m.item(menu.MenuItem("Save Changes", save_changes))
     m.item(menu.MenuItem("Back", lambda: menu.stack.pop()))
     m.show()
 

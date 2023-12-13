@@ -7,6 +7,8 @@ class Macro_Type:
     KEY_PRESS = 5
     REPEAT_LINES = 6
     TINY_TASK = 7
+    GLOBAL_TINY_TASK = 8
+    LISTENER = 9
 
 
 MAPPED_TYPES = {
@@ -18,13 +20,15 @@ MAPPED_TYPES = {
     Macro_Type.KEY_PRESS: "Key Press",
     Macro_Type.REPEAT_LINES: "Repeat Lines",
     Macro_Type.TINY_TASK: "Tiny Task",
+    Macro_Type.GLOBAL_TINY_TASK: "Tiny Task (/bin)",
+    Macro_Type.LISTENER: "Event Listener",
 }
 
 
 def get_seq_macro_str(x: dict[str], i: int):
     match x["type"]:
         case Macro_Type.CLICK:
-            return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.CLICK]}({x['position'][0]}, {x['position'][1]})"
+            return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.CLICK]}({x['position'][0]}, {x['position'][1]}) {'- Joins private server' if x['should_fullscreen_roblox'] else ''}"
         case Macro_Type.WAIT:
             return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.WAIT]}({x['ms']}ms)"
         case Macro_Type.WAIT_CONDITIONALLY:
@@ -46,5 +50,9 @@ def get_seq_macro_str(x: dict[str], i: int):
             )
         case Macro_Type.TINY_TASK:
             return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.TINY_TASK]} Macro"
+        case Macro_Type.GLOBAL_TINY_TASK:
+            return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.GLOBAL_TINY_TASK]} Macro ({x['file_name']})"
+        case Macro_Type.LISTENER:
+            return f"[{i + 1}]\t{MAPPED_TYPES[Macro_Type.LISTENER]} ({x['name']})"
         case _:
             return x["type"]

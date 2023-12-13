@@ -63,6 +63,7 @@ class Menu:
 
     def on_release_handler(self, key: pynput.keyboard.Key | pynput.keyboard.KeyCode):
         global stack
+
         if stack[-1] == self:
             self._prev_pressed = key
             self._pressed = None
@@ -89,7 +90,7 @@ class Menu:
                         components.extend(menu_items)
                 else:
                     components.append(menu_item)
-
+            self.set_index(min(max(0, self._idx), len(components) - 1))
             while type(components[self._idx]) == str:
                 match self._pressed:
                     case pynput.keyboard.Key.down:
