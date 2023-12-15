@@ -501,8 +501,18 @@ def macro_editor(props: dict[str]):
             for path in os.listdir(f"{os.getcwd()}\\macros\\{id}")
             if os.path.isdir(f"{os.getcwd()}\\macros\\{id}\\{path}")
         ]
+        disabled_cam_angles = set(props["disabled_cam_angles"])
         return [
-            menu.MenuItem(x, (lambda x: lambda: cam_editor.camera_edit(id, x))(x))
+            menu.MenuItem(
+                (
+                    lambda x: (
+                        lambda: (
+                            x if x not in disabled_cam_angles else f"[DISABLED] {x}"
+                        )
+                    )
+                )(x),
+                (lambda x: lambda: cam_editor.camera_edit(id, x))(x),
+            )
             for x in dirs
         ]
 
