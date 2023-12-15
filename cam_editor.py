@@ -28,13 +28,14 @@ def compare_to(macro_id: str, cam_name: str) -> float:
     bbox = win32gui.GetWindowRect(hwnd)
     bmp_file = ImageGrab.grab(bbox)
     a = np.array(bmp_file)
-    if cam_name not in memoized:
+    key = macro_id + cam_name
+    if key not in memoized:
         b = np.array(
             Image.open(f"{os.getcwd()}\\macros\\{macro_id}\\{cam_name}\\angle.bmp")
         )
-        memoized[cam_name] = b
+        memoized[key] = b
     else:
-        b = memoized[cam_name]
+        b = memoized[key]
     return np.sum(a == b) / a.size
 
 
