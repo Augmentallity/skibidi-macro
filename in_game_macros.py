@@ -7,7 +7,7 @@ from event_listeners import EVENT_LISTENERS_MAPPED
 from macro import Macro_Type, get_seq_macro_str
 import macro_utils
 import macro_edit
-from macro_utils import on_macro_change
+from macro_utils import get_macro, on_macro_change
 import menu
 import uuid
 import utils
@@ -32,6 +32,7 @@ def create_macro():
                 "waves": 10,
                 "id": _id,
                 "lobby_sequence": [],
+                "disabled_cam_angles": [],
             }
         )  # changeable
         utils.write_macros(macros)
@@ -379,6 +380,8 @@ def test_macro_seq(
     found_cam_angle_name = None
     s = time.perf_counter()
     e = s
+    macro = get_macro(macro_id)
+    disabled_cam_angles = set(macro["disabled_cam_angles"])
     while (
         not should_exit
         and found_cam_angle_name == None
@@ -387,7 +390,10 @@ def test_macro_seq(
     ):
         e = time.perf_counter()
         for cam_angle in dirs:
-            if cam_editor.compare_to(macro_id, cam_angle) >= cam_editor.SIMILARITY:
+            if (
+                cam_angle not in disabled_cam_angles
+                and cam_editor.compare_to(macro_id, cam_angle) >= cam_editor.SIMILARITY
+            ):
                 found_cam_angle_name = cam_angle
                 break
     if len(dirs) == 0:

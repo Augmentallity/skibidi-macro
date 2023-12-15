@@ -3,6 +3,7 @@ from typing import Callable
 from uuid import uuid4
 import menu
 import win32gui
+from macro_edit import get_macro
 import win32ui
 import win32con
 import pyautogui
@@ -49,6 +50,8 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
     screenshot_taken = False
     user_prompted = False
     lock_screenshot = bool(bmp_file)
+    macro = get_macro(macro_id)
+    is_disabled = cam_name in macro["disabled_cam_angles"]
     wave = 1
 
     def similarity_listener(listening: Callable[[], bool]):
@@ -173,6 +176,15 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
         nonlocal lock_screenshot
         lock_screenshot = not lock_screenshot
 
+    def toggle_disable_cam_angle():
+        nonlocal is_disabled
+        is_disabled = not is_disabled
+        if is_disabled:
+            macro["disabled_cam_angles"].append(cam_name)
+        else:
+            macro["disabled_cam_angles"].remove(cam_name)
+        utils.write_macros()
+
     def delete_cam_angle():
         nonlocal user_prompted
         user_prompted = True
@@ -190,8 +202,22 @@ def camera_edit(macro_id: str, cam_name: str | None = None):
         "Maps have different camera angles. To differentiate camera angles,\nthe program needs to capture a screenshot of roblox.\n\nTo add macros for waves, record a tinytask and compile the\nmacro into the folder that matches the camera angle name.\n\n(Note: the compiled tinytask will automatically be moved to corresponding wave folders)"
     )
     m.text(compare)
-    m.text("")
+    m.text(lambda: ("\n[NOTICE] This camera angle is DISABLED" if is_disabled else ""))
     m.item(menu.MenuItem(lambda: f"Camera Angle Name: {cam_name}", change_name))
+    m.item(
+        lambda: (
+            [
+                menu.MenuItem(
+                    lambda: (
+                        "Enable Camera Angle" if is_disabled else "Disable Camera Angle"
+                    ),
+                    toggle_disable_cam_angle,
+                )
+            ]
+            if cam_name
+            else []
+        )
+    )
     m.item(
         lambda: (
             [menu.MenuItem("Screenshot Roblox (press BACKSPACE)", capture)]
