@@ -283,14 +283,17 @@ def main(macro_id: str):
         nonlocal losses
 
         has_lost = False
+        run_ended = False
         if is_disconnected() or should_stop():
             return
 
         def detect_loss(
-            should_stop: Callable[[], bool], is_disconnected: Callable[[], bool]
+            should_stop: Callable[[], bool],
+            is_disconnected: Callable[[], bool],
+            run_ended: Callable[[], bool],
         ):
             nonlocal has_lost
-            while not should_stop() and not is_disconnected():
+            while not should_stop() and not is_disconnected() and not run_ended():
                 pos1, color1 = utils.get_config_prop(utils.DEFEAT_LABEL)
                 pos2, color2 = utils.get_config_prop(utils.HP_BAR_ZERO)
 
@@ -303,10 +306,7 @@ def main(macro_id: str):
 
         loss_detector = threading.Thread(
             target=detect_loss,
-            args=(
-                should_stop,
-                is_disconnected,
-            ),
+            args=(should_stop, is_disconnected, lambda: run_ended),
         )
         loss_detector.start()
         dirs = [
@@ -314,6 +314,7 @@ def main(macro_id: str):
             for path in os.listdir(f"{os.getcwd()}\\macros\\{macro_id}")
             if os.path.isdir(f"{os.getcwd()}\\macros\\{macro_id}\\{path}")
         ]
+        disabled_cam_angles = set(macro["disabled_cam_angles"])
         while not is_disconnected() and not should_stop():
             found_cam_angle_name = None
             has_lost = False
@@ -329,8 +330,11 @@ def main(macro_id: str):
             ):
                 e = time.perf_counter()
                 for cam_angle in dirs:
-                    val = cam_editor.compare_to(macro_id, cam_angle)
-                    if val >= cam_editor.SIMILARITY:
+                    if (
+                        cam_angle not in disabled_cam_angles
+                        and cam_editor.compare_to(macro_id, cam_angle)
+                        >= cam_editor.SIMILARITY
+                    ):
                         found_cam_angle_name = cam_angle
                         logs.append(f"Detected {found_cam_angle_name}")
                         break
@@ -381,6 +385,7 @@ def main(macro_id: str):
                 os.system('"%CD%/bin/retryfromloss.exe"')
                 time.sleep(3)
             else:
+                run_ended = True
                 break
 
     while not should_stop:
